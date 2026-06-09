@@ -1,0 +1,25 @@
+[Unit]
+Description=Daily backup of kvadstat.db (sqlite .backup + gzip + 14d rotation)
+After=network.target
+
+[Service]
+Type=oneshot
+User=kvadstat
+Group=kvadstat
+WorkingDirectory=/opt/kvadstat
+Environment=TZ=Europe/Moscow
+# Скрипт идёт из репо, install.sh синхронизирует его в /opt/kvadstat/deploy/.
+ExecStart=/bin/bash /opt/kvadstat/deploy/backup.sh
+StandardOutput=journal
+StandardError=journal
+
+# Бэкап в реальности использует ~50МБ (sqlite3 .backup + gzip pipe);
+# 128МБ с запасом. 10 минут — хватает на 40МБ БД с gzip -6.
+MemoryMax=128M
+CPUQuota=200%
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+ReadWritePaths=/opt/kvadstat/data
+TimeoutStartSec=600

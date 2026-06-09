@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://kvadstat.gorev.space/sitemap.xml

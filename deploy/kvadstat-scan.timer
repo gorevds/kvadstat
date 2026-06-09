@@ -1,0 +1,11 @@
+[Unit]
+Description=Run kvadstat-scan daily at 06:00 MSK
+Requires=kvadstat-scan.service
+
+[Timer]
+OnCalendar=*-*-* 06:00:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

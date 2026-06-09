@@ -1,0 +1,2843 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Kvadstat — цены на новостройки Москвы: динамика, скидки, скорость продаж</title>
+<meta name="description" content="Kvadstat — независимый трекер цен на новостройки Москвы. Ежедневная динамика цен, реальные скидки и скорость продаж по ЖК топ-застройщиков: ПИК, А101, Донстрой, Level, Абсолют и др. Без рекламы и агентов." />
+<meta name="keywords" content="новостройки москвы, цены на квартиры, динамика цен, скидки застройщиков, скорость продаж, ЖК, первичный рынок, ПИК, А101, Донстрой, Level" />
+<meta name="author" content="Dmitrii Gorev" />
+<meta name="robots" content="index, follow" />
+<meta name="theme-color" content="#2563eb" />
+<link rel="canonical" href="https://kvadstat.gorev.space/" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/favicon.svg" />
+<!-- Open Graph -->
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Kvadstat" />
+<meta property="og:locale" content="ru_RU" />
+<meta property="og:title" content="Kvadstat — цены на новостройки Москвы" />
+<meta property="og:description" content="Ежедневная динамика цен, реальные скидки и скорость продаж по ЖК топ-застройщиков Москвы. Без рекламы и агентов." />
+<meta property="og:url" content="https://kvadstat.gorev.space/" />
+<meta property="og:image" content="https://kvadstat.gorev.space/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Kvadstat — цены на новостройки Москвы" />
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Kvadstat — цены на новостройки Москвы" />
+<meta name="twitter:description" content="Ежедневная динамика цен, реальные скидки и скорость продаж по ЖК топ-застройщиков Москвы." />
+<meta name="twitter:image" content="https://kvadstat.gorev.space/og-image.png" />
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://kvadstat.gorev.space/#website",
+      "name": "Kvadstat",
+      "description": "Трекер цен на новостройки Москвы: динамика, скидки, скорость продаж.",
+      "url": "https://kvadstat.gorev.space/",
+      "inLanguage": "ru-RU"
+    },
+    {
+      "@type": "Dataset",
+      "name": "Цены на новостройки Москвы — Kvadstat",
+      "description": "Ежедневные срезы цен на квартиры в новостройках Москвы от топ-застройщиков (ПИК, А101, Донстрой, Level, Абсолют, ГК ФСК, MR Group и др.) с историей цен, реальными скидками и скоростью продаж по ЖК.",
+      "url": "https://kvadstat.gorev.space/",
+      "keywords": ["новостройки", "Москва", "цены на квартиры", "первичный рынок", "застройщики", "скорость продаж"],
+      "license": "https://opendatacommons.org/licenses/odbl/",
+      "isAccessibleForFree": true,
+      "creator": { "@type": "Person", "name": "Dmitrii Gorev" },
+      "spatialCoverage": { "@type": "Place", "name": "Москва, Россия" },
+      "temporalCoverage": "2025-06/.."
+    }
+  ]
+}
+</script>
+<link href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/css/tabulator_modern.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --fg: #1f2937;
+    --muted: #6b7280;
+    --accent: #2563eb;
+    --promo: #16a34a;
+    --promo-bg: #dcfce7;
+    --card: #ffffff;
+    --border: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    font-size: 14px;
+  }
+  header {
+    background: var(--card);
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 18px;
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    text-decoration: none;
+    color: var(--fg);
+  }
+  .brand:hover { text-decoration: none; }
+  .brand-mark { width: 30px; height: 30px; display: block; border-radius: 8px; }
+  .brand-name {
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+    color: var(--fg);
+  }
+  header h1 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    align-self: center;
+  }
+  header .stats {
+    color: var(--muted);
+    font-size: 13px;
+    display: flex;
+    gap: 16px;
+  }
+  header .stats b { color: var(--fg); }
+  header a { color: var(--accent); text-decoration: none; }
+  header a:hover { text-decoration: underline; }
+  main { padding: 16px 24px 24px; }
+  /* Sticky-полоса фильтров — остаётся видимой при прокрутке таблицы */
+  .controls-sticky {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--bg);
+    margin: -16px -24px 12px;
+    padding: 10px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .reset-btn {
+    color: var(--accent);
+    background: transparent !important;
+    border: 1px solid transparent !important;
+  }
+  .reset-btn:hover { border-color: var(--accent) !important; }
+  #grid {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .promo-row { background: var(--promo-bg) !important; }
+  .promo-badge {
+    display: inline-block;
+    background: var(--promo);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 11px;
+  }
+  .tabulator { font-size: 13px; }
+  .tabulator-row .tabulator-cell { padding: 6px 10px; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .struck { text-decoration: line-through; color: var(--muted); }
+  footer {
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+    padding: 16px;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .controls button {
+    border: 1px solid var(--border);
+    background: var(--card);
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .controls button:hover { border-color: var(--accent); color: var(--accent); }
+  .controls button.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .controls input[type="number"] {
+    width: 70px;
+    padding: 5px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cols-wrap { position: relative; }
+  .cols-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    box-shadow: 0 6px 20px rgba(0,0,0,.08);
+    max-height: 60vh;
+    overflow-y: auto;
+    z-index: 100;
+    min-width: 220px;
+  }
+  .cols-panel.open { display: block; }
+  /* «Все фильтры» — раскрываем как fixed-панель с позицией из JS
+     (positionMorePanel). Раньше это был absolute .cols-panel с right:0
+     относительно своего .cols-wrap: когда тулбар (flex-wrap) переносил
+     кнопку на свою строку слева, панель min-width:300 уезжала за ЛЕВЫЙ
+     край экрана и параметры было не видно. Fixed + клампинг в JS держит
+     её на экране при любом положении кнопки; сетка делает поля читаемее. */
+  #moreFiltersPanel {
+    position: fixed;
+    right: auto;
+    min-width: 300px;
+    max-width: min(620px, calc(100vw - 24px));
+    white-space: normal;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 6px 18px;
+  }
+  #moreFiltersPanel.open { display: grid; }
+  #moreFiltersPanel label:not(.range-label),
+  #moreFiltersPanel .cols-actions { grid-column: 1 / -1; }
+  /* Кнопки «Все фильтры» / «Колонки» зафиксированы в своём втором ряду
+     слева (controls-break форсит перенос). Раз они теперь у ЛЕВОГО края,
+     панель «Колонки» должна раскрываться ВПРАВО (left:0), иначе при right:0
+     min-width:220 уезжал бы за левый край экрана. */
+  .controls-break { flex-basis: 100%; height: 0; margin: 0; padding: 0; }
+  #colsPanel { left: 0; right: auto; }
+  .cols-panel label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    font-size: 13px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .cols-panel .cols-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--border);
+  }
+  .cols-panel .cols-actions button {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 12px;
+  }
+  /* Расширенные фильтры — popover с range/select-полями */
+  .cols-panel label.range-label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    white-space: nowrap;
+  }
+  .cols-panel .range-inputs { display: inline-flex; gap: 4px; }
+  .cols-panel .range-inputs input,
+  .cols-panel select {
+    width: 70px;
+    padding: 3px 6px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+  .cols-panel select { width: auto; }
+  .more-filters-count {
+    display: none;
+    background: var(--accent);
+    color: white;
+    font-size: 11px;
+    padding: 0 6px;
+    border-radius: 10px;
+    margin-left: 4px;
+    vertical-align: middle;
+  }
+  .more-filters-count.active { display: inline-block; }
+  .metro-type {
+    display: inline-block;
+    color: var(--muted);
+    font-size: 11px;
+    margin-right: 4px;
+  }
+  /* Переключатель «Таблица / Карта» */
+  .view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-right: 12px;
+  }
+  .view-toggle button {
+    background: var(--card);
+    border: none;
+    padding: 5px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--muted);
+    border-right: 1px solid var(--border);
+  }
+  .view-toggle button:last-child { border-right: none; }
+  .view-toggle button.active {
+    background: var(--accent);
+    color: white;
+  }
+  #map {
+    display: none;
+    width: 100%;
+    height: calc(100vh - 230px);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    /* собственный stacking-контекст: внутренние слои Leaflet (panes до
+       z-index 700, контролы ~1000) иначе перекрывают выпадающие панели
+       «Все фильтры»/«Колонки». z-index:0 держит их ниже тулбара (z-index 50)
+       и панелей (100). */
+    position: relative;
+    z-index: 0;
+  }
+  .map-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  /* Сохранённые поиски (фильтры в localStorage) */
+  .saved-wrap { position: relative; display: inline-block; }
+  .saved-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    min-width: 260px;
+    max-width: 340px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 0;
+    box-shadow: 0 6px 20px rgba(0,0,0,.08);
+    z-index: 200;
+    max-height: 60vh;
+    overflow-y: auto;
+  }
+  .saved-panel.open { display: block; }
+  .saved-item {
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    border: none;
+    background: transparent;
+    width: 100%;
+    text-align: left;
+  }
+  .saved-item:hover { background: #f1f5f9; }
+  .saved-item .label { flex: 1; }
+  .saved-item .del {
+    color: #94a3b8;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .saved-item .del:hover { color: #dc2626; background: #fef2f2; }
+  .saved-panel .saved-empty {
+    padding: 10px 14px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .saved-panel .saved-actions {
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 4px;
+    display: flex;
+    gap: 6px;
+  }
+  .saved-panel .saved-actions input {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    font-size: 13px;
+  }
+  .saved-panel .saved-actions button {
+    padding: 4px 10px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  /* Боковая панель деталей квартиры */
+  .detail-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(15,23,42,0.40);
+    z-index: 998;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s ease-out;
+  }
+  .detail-overlay.open { opacity: 1; pointer-events: auto; }
+  .detail-panel {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: 540px; max-width: 96vw;
+    background: var(--card);
+    box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+    z-index: 999;
+    transform: translateX(100%);
+    transition: transform 0.18s ease-out;
+    display: flex; flex-direction: column;
+  }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-panel header.detail-head {
+    display: flex; align-items: baseline; gap: 14px;
+    padding: 14px 20px; border-bottom: 1px solid var(--border);
+    background: var(--card);
+  }
+  .detail-panel header.detail-head h2 {
+    margin: 0; font-size: 17px; font-weight: 600; flex: 1;
+  }
+  .detail-panel .detail-close {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--muted); font-size: 22px; padding: 0 6px; line-height: 1;
+  }
+  .detail-panel .detail-close:hover { color: var(--fg); }
+  .detail-panel main.detail-body {
+    flex: 1; overflow-y: auto; padding: 16px 20px;
+  }
+  .detail-section { margin-bottom: 22px; }
+  .detail-section h3 {
+    margin: 0 0 8px 0; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--muted); font-weight: 600;
+  }
+  .detail-kv { display: grid; grid-template-columns: 140px 1fr; gap: 4px 12px; font-size: 13px; }
+  .detail-kv .k { color: var(--muted); }
+  .detail-kv .v { font-variant-numeric: tabular-nums; }
+  .detail-price-row {
+    display: flex; align-items: baseline; gap: 12px;
+    font-size: 22px; font-weight: 600;
+  }
+  .detail-price-row .struck {
+    font-size: 14px; font-weight: 400;
+    color: var(--muted); text-decoration: line-through;
+  }
+  .detail-discount-badge {
+    display: inline-block; padding: 2px 8px; background: var(--promo-bg);
+    color: var(--promo); border-radius: 4px; font-size: 12px;
+    font-weight: 600;
+  }
+  .detail-plan { max-width: 100%; max-height: 280px; border: 1px solid var(--border); border-radius: 4px; background: white; }
+  .detail-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .detail-actions a, .detail-actions button {
+    display: inline-block; padding: 7px 14px; font-size: 13px;
+    background: var(--accent); color: white;
+    border: none; border-radius: 6px; cursor: pointer;
+    text-decoration: none;
+  }
+  .detail-actions a.secondary, .detail-actions button.secondary {
+    background: var(--card); color: var(--fg); border: 1px solid var(--border);
+  }
+  .detail-chart {
+    width: 100%; height: 140px;
+    border: 1px solid var(--border); border-radius: 4px;
+    background: white;
+  }
+  /* Мобильная карточная вёрстка (вместо таблицы на узких экранах) */
+  #cardList { display: none; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    line-height: 1.45;
+    cursor: pointer;
+  }
+  .card.promo-card { background: var(--promo-bg); }
+  .card-head {
+    display: flex; align-items: baseline; gap: 8px;
+    margin-bottom: 6px;
+  }
+  .card-head .dev-tag {
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    color: white; font-weight: 600; flex-shrink: 0;
+  }
+  .card-head .zhk { flex: 1; font-weight: 600; }
+  .card-price {
+    font-size: 17px; font-weight: 700; margin: 4px 0;
+  }
+  .card-price .struck {
+    font-size: 13px; font-weight: 400;
+    color: var(--muted); text-decoration: line-through; margin-left: 8px;
+  }
+  .card-meta {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px;
+    color: var(--muted); font-size: 12px; margin-top: 4px;
+  }
+  .card-meta b { color: var(--fg); font-weight: 500; }
+  @media (max-width: 768px) {
+    body { font-size: 13px; }
+    header { padding: 10px 12px; gap: 10px; }
+    header h1 { font-size: 14px; }
+    header .stats { font-size: 12px; gap: 10px; }
+    main { padding: 8px 12px 12px; }
+    .controls-sticky { margin: -8px -12px 8px; padding: 8px 12px; }
+    .controls { gap: 8px 10px; font-size: 12px; }
+    .controls input[type="number"] { width: 56px !important; }
+    /* Tabulator продолжает РАБОТАТЬ (display:none ломает его virtual-DOM
+       и table.download). Прячем через visibility+absolute — DOM активен,
+       layout считается, экспорт работает; карточки рендерим поверх. */
+    #grid { visibility: hidden !important; position: absolute !important;
+            left: -9999px !important; height: 0 !important; }
+    #cardList { display: block; }
+    #map { height: calc(100vh - 280px); min-height: 300px; }
+    .detail-panel { width: 100%; max-width: 100%; }
+    .detail-kv { grid-template-columns: 110px 1fr; }
+    .view-toggle { margin-right: 0; }
+  }
+  /* ── Вкладки верхнего уровня ─────────────────────────────── */
+  .tabs {
+    display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+  .tabs button {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border); background: var(--card);
+    padding: 9px 18px; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: var(--muted);
+    line-height: 1.4; white-space: nowrap;
+  }
+  .tabs button:hover { border-color: var(--accent); color: var(--accent); }
+  .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  /* controls-sticky имеет margin-top:-16px (исторически — поднырнуть под
+     header). Внутри вкладки это наезжало на НИЗ таб-кнопок (z-index:50
+     перекрывал нижнюю кромку «ЖК»/«Все объекты»). Гасим отрицательный
+     верхний отступ — кнопки больше не обрезаются. */
+  .tab-panel .controls-sticky { margin-top: 0; }
+  /* ── Главная ─────────────────────────────────────────────── */
+  .home-hero { max-width: 880px; margin: 0 auto; }
+  .home-hero h2 { font-size: 26px; margin: 8px 0 12px; line-height: 1.25; }
+  .home-hero p { font-size: 15px; line-height: 1.6; color: #334155; }
+  .home-stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px; margin: 22px 0;
+  }
+  .home-stat {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .home-stat .num { font-size: 24px; font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums; }
+  .home-stat .lbl { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .home-cta { display: flex; gap: 10px; flex-wrap: wrap; margin: 8px 0 26px; }
+  .home-cta button {
+    border: none; border-radius: 8px; padding: 11px 20px; cursor: pointer;
+    font-size: 14px; font-weight: 600;
+  }
+  .home-cta button.primary { background: var(--accent); color: #fff; }
+  .home-cta button.ghost { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+  .home-how { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px; margin-top: 10px; }
+  .home-how .card-how { background: var(--card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px; }
+  .home-how h3 { font-size: 15px; margin: 0 0 6px; }
+  .home-how p { font-size: 13px; line-height: 1.5; margin: 0; }
+  /* ── ЖК ──────────────────────────────────────────────────── */
+  .zhk-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-bottom: 14px; }
+  .zhk-controls select, .zhk-controls input[type="text"] {
+    padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px; }
+  .zhk-controls input[type="text"] { min-width: 200px; }
+  .zhk-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px; }
+  .zhk-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 16px; cursor: pointer; transition: border-color .12s, box-shadow .12s;
+  }
+  .zhk-card:hover { border-color: var(--accent); box-shadow: 0 4px 14px rgba(0,0,0,.07); }
+  .zhk-card .zk-name { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .zhk-card .zk-sub { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  .zhk-card .zk-price { font-size: 14px; font-weight: 600; }
+  .zhk-card .zk-price small { color: var(--muted); font-weight: 400; }
+  .zk-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .zk-badge { font-size: 11px; padding: 2px 8px; border-radius: 12px;
+    background: #eef2ff; color: #3730a3; font-weight: 600; white-space: nowrap; }
+  .zk-badge.sold { background: #ecfdf5; color: #047857; }
+  .zk-badge.new { background: #eff6ff; color: #1d4ed8; }
+  .zk-badge.dom { background: #fef9c3; color: #854d0e; }
+  .zk-badge.off { background: #fee2e2; color: #b91c1c; }
+  .zk-badge.lowconf { background: #f1f5f9; color: #64748b; }
+  .zk-curve { margin-top: 10px; }
+  .zk-curve .cap { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+  /* ЖК-деталь (оверлей) */
+  .zhk-detail {
+    position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 1200;
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+  }
+  .zhk-detail[hidden] { display: none; }
+  .zhk-detail .inner {
+    background: var(--card); border-radius: 14px; padding: 22px 24px;
+    max-width: 560px; width: 100%; max-height: 88vh; overflow-y: auto;
+  }
+  .zhk-detail h2 { margin: 0 0 4px; font-size: 20px; }
+  .zhk-detail .dclose { float: right; border: none; background: transparent;
+    font-size: 20px; cursor: pointer; color: var(--muted); }
+  .zhk-detail .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
+    gap: 10px; margin: 16px 0; }
+  .zhk-detail .metric { background: var(--bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; }
+  .zhk-detail .metric .m-num { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .zhk-detail .metric .m-lbl { font-size: 11px; color: var(--muted); }
+  .conf-note { font-size: 12px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <a class="brand" href="#home" aria-label="Kvadstat — главная">
+    <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="nxHdr" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#2563eb"/><stop offset="1" stop-color="#4f46e5"/>
+        </linearGradient>
+      </defs>
+      <rect width="64" height="64" rx="14" fill="url(#nxHdr)"/>
+      <g fill="#ffffff">
+        <rect x="13" y="36" width="8" height="16" rx="2"/>
+        <rect x="28" y="28" width="8" height="24" rx="2"/>
+        <rect x="43" y="20" width="8" height="32" rx="2"/>
+      </g>
+      <path d="M14 33 L29 25 L44 17" fill="none" stroke="#fbbf24"
+            stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="44" cy="17" r="3.4" fill="#fbbf24"/>
+    </svg>
+    <span class="brand-name">kvadstat</span>
+  </a>
+  <h1>Цены на новостройки Москвы: динамика, скидки, скорость продаж</h1>
+  <div id="trunc-banner" role="alert" style="display:none;width:100%;order:99;
+       background:#fef3c7;color:#92400e;border:1px solid #f59e0b;border-radius:6px;
+       padding:6px 12px;font-size:13px;font-weight:600;margin-top:6px"></div>
+  <div class="stats" id="stats">загрузка…</div>
+  <div style="margin-left:auto;display:flex;align-items:center">
+    <div class="view-toggle" role="tablist" aria-label="Режим отображения">
+      <button type="button" role="tab" data-view="table" class="active"
+              aria-controls="grid" aria-selected="true">📋 Таблица</button>
+      <button type="button" role="tab" data-view="map"
+              aria-controls="map" aria-selected="false">🗺 Карта</button>
+    </div>
+    <a href="/kvadstat/today_all" target="_blank">сырые данные</a>
+    ·
+    <a href="/kvadstat/snapshots?_sort_desc=scan_date" target="_blank">история</a>
+    ·
+    <a href="https://github.com/gorevds/kvadstat" target="_blank">репо</a>
+  </div>
+</header>
+
+<main>
+  <nav class="tabs" role="tablist" aria-label="Разделы">
+    <button type="button" data-tab="home" class="active" role="tab">🏠 Главная</button>
+    <button type="button" data-tab="zhk" role="tab">🏙 ЖК</button>
+    <button type="button" data-tab="objects" role="tab">📋 Все объекты</button>
+  </nav>
+
+  <section id="tab-home" class="tab-panel active">
+    <div class="home-hero">
+      <h2>Честные цены на новостройки Москвы — и как они меняются</h2>
+      <p>Независимый трекер первичного рынка: каждый день снимаем цены напрямую
+      с сайтов застройщиков и храним историю. Без рекламы, без агентов, без
+      накруток. Мы показываем то, что инкумбенты прячут: <b>реальную динамику
+      цен</b>, <b>настоящие скидки</b> (а не маркетинговые) и <b>скорость
+      продаж</b> по каждому ЖК.</p>
+      <div id="homeStats" class="home-stats"></div>
+      <div class="home-cta">
+        <button type="button" class="primary" data-go="zhk">🏙 ЖК и скорость продаж</button>
+        <button type="button" class="ghost" data-go="objects">📋 Все квартиры</button>
+      </div>
+      <div class="home-how">
+        <div class="card-how">
+          <h3>📉 История цен</h3>
+          <p>По каждой квартире — как менялась цена. Видно, дорожает ЖК или
+          застройщик распродаёт остатки.</p>
+        </div>
+        <div class="card-how">
+          <h3>🏷 Реальные скидки</h3>
+          <p>Сравниваем сегодняшнюю цену со вчерашней. «Скидка 20%» часто
+          оказывается возвратом к цене месячной давности.</p>
+        </div>
+        <div class="card-how">
+          <h3>⚡ Скорость продаж</h3>
+          <p>Сколько квартир в ЖК ушло за месяц, как быстро (дней в продаже) и
+          где продажи встали — сигнал, которого нет ни у кого публично.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-zhk" class="tab-panel">
+    <div class="zhk-controls controls-sticky">
+      <span>Город:</span><select id="zhkCity"><option value="all">все</option></select>
+      <span>Застройщик:</span><select id="zhkDev"><option value="all">все</option></select>
+      <input type="text" id="zhkSearch" placeholder="поиск по названию ЖК…">
+      <span>Сортировка:</span>
+      <select id="zhkSort">
+        <option value="absorbed">по продажам за 30д</option>
+        <option value="new">по новым лотам</option>
+        <option value="active">по числу в продаже</option>
+        <option value="dom">по скорости (DOM)</option>
+        <option value="price">по цене ₽/м²</option>
+        <option value="name">по названию</option>
+      </select>
+      <label><input type="checkbox" id="zhkActiveOnly" checked> только продающиеся</label>
+      <span id="zhkCount" style="color:var(--muted);font-size:13px"></span>
+    </div>
+    <div id="zhkGrid" class="zhk-grid"></div>
+  </section>
+  <div id="zhkDetail" class="zhk-detail" hidden></div>
+
+  <section id="tab-objects" class="tab-panel">
+  <div class="controls controls-sticky">
+    <span>Застройщик:</span>
+    <select id="devFilter"><option value="all">все</option></select>
+    <span style="color:var(--muted);margin-left:8px">|</span>
+    <span>Город:</span>
+    <select id="cityFilter"><option value="all">все</option></select>
+    <span style="color:var(--muted);margin-left:8px">|</span>
+    <span>ЖК:</span>
+    <select id="zkFilter"><option value="all">все</option></select>
+    <span style="color:var(--muted);margin-left:8px">|</span>
+    <span>Комнат:</span>
+    <button data-rooms="all" class="active">все</button>
+    <button data-rooms="студия">студии</button>
+    <button data-rooms="1к">1к</button>
+    <button data-rooms="2к">2к</button>
+    <button data-rooms="3к">3к</button>
+    <button data-rooms="4+">4+</button>
+    <span style="color:var(--muted);margin-left:8px">|</span>
+    <span>Класс:</span>
+    <button data-klass="эконом">эконом</button>
+    <button data-klass="комфорт">комфорт</button>
+    <button data-klass="бизнес">бизнес</button>
+    <button data-klass="премиум">премиум</button>
+    <button data-klass="элит">элит</button>
+    <span style="color:var(--muted);margin-left:8px">|</span>
+    <span>Цена:</span>
+    <input type="number" id="priceMin" placeholder="от" step="0.5" min="0" style="width:64px">
+    <span style="color:var(--muted)">—</span>
+    <input type="number" id="priceMax" placeholder="до" step="0.5" min="0" style="width:64px">
+    <span style="color:var(--muted)">млн ₽</span>
+    <span style="color:var(--muted);margin-left:8px">|</span>
+    <span>Площадь:</span>
+    <input type="number" id="areaMin" placeholder="от" step="1" min="0">
+    <span style="color:var(--muted)">—</span>
+    <input type="number" id="areaMax" placeholder="до" step="1" min="0">
+    <span style="color:var(--muted)">м²</span>
+    <span style="color:var(--muted);margin-left:8px">|</span>
+    <label><input type="checkbox" id="promoOnly"> только со скидкой</label>
+    <label><input type="checkbox" id="hideApart" checked> без апартаментов</label>
+    <button id="resetBtn" type="button" class="reset-btn">✕ Сбросить</button>
+    <span class="saved-wrap">
+      <button id="savedBtn" type="button" class="reset-btn" style="color:var(--accent)">★ Сохранённые</button>
+      <div id="savedPanel" class="saved-panel"></div>
+    </span>
+    <button id="exportBtn" type="button" class="reset-btn" style="color:var(--accent);margin-left:auto"
+            title="Скачать текущую выборку в CSV (открывается в Excel)">
+      📥 CSV
+    </button>
+    <span class="controls-break"></span>
+    <span class="cols-wrap">
+      <button id="moreFiltersBtn" type="button">⚙ Все фильтры<span id="moreFiltersCount" class="more-filters-count">0</span></button>
+      <div id="moreFiltersPanel" class="cols-panel" style="min-width:300px">
+        <label class="range-label">
+          <span>До метро, мин:</span>
+          <span class="range-inputs">
+            <input type="number" id="metroMin" placeholder="от" min="0" max="120" step="1">
+            <input type="number" id="metroMax" placeholder="до" min="0" max="120" step="1">
+          </span>
+        </label>
+        <label class="range-label">
+          <span>Км от центра:</span>
+          <span class="range-inputs">
+            <input type="number" id="distMin" placeholder="от" min="0" step="0.5">
+            <input type="number" id="distMax" placeholder="до" min="0" step="0.5">
+          </span>
+        </label>
+        <label class="range-label">
+          <span>Этаж:</span>
+          <span class="range-inputs">
+            <input type="number" id="floorMin" placeholder="от" min="1" step="1">
+            <input type="number" id="floorMax" placeholder="до" min="1" step="1">
+          </span>
+        </label>
+        <label class="range-label">
+          <span>Заселение не позже:</span>
+          <select id="settleYearMax">
+            <option value="">— любое —</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
+            <option value="2028">2028</option>
+            <option value="2029">2029</option>
+            <option value="2030">2030+</option>
+          </select>
+        </label>
+        <label class="range-label">
+          <span>Отделка:</span>
+          <select id="finishFilter">
+            <option value="all">любая</option>
+            <option value="С отделкой">С отделкой</option>
+            <option value="С отделкой и мебелью">С отделкой и мебелью</option>
+            <option value="WhiteBox">WhiteBox</option>
+            <option value="Предчистовая отделка">Предчистовая отделка</option>
+            <option value="Без отделки">Без отделки</option>
+          </select>
+        </label>
+        <label><input type="checkbox" id="onlyFree"> только свободные (без брони)</label>
+        <label><input type="checkbox" id="hasMetro"> только с известным метро</label>
+        <div class="cols-actions">
+          <button type="button" id="moreFiltersReset">Сбросить эти</button>
+        </div>
+      </div>
+    </span>
+    <span class="cols-wrap">
+      <button id="colsBtn" type="button">⚙ Колонки</button>
+      <div id="colsPanel" class="cols-panel"></div>
+    </span>
+  </div>
+  <div id="grid"></div>
+  <div id="cardList" aria-live="polite"></div>
+  <div id="map"><div class="map-placeholder">загрузка карты…</div></div>
+  </section>
+</main>
+
+<!-- Боковая панель деталей: открывается по клику на строку таблицы -->
+<div id="detailOverlay" class="detail-overlay" aria-hidden="true"></div>
+<aside id="detailPanel" class="detail-panel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="detailTitle" tabindex="-1">
+  <header class="detail-head">
+    <h2 id="detailTitle">Квартира</h2>
+    <button class="detail-close" type="button" aria-label="Закрыть">✕</button>
+  </header>
+  <main class="detail-body" id="detailBody">загрузка…</main>
+</aside>
+
+<footer id="footer"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/js/tabulator.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Datasette режет ответ на max_returned_rows (см. deploy/kvadstat.service). В
+// _shape=array нет флага усечения, поэтому держим лимит и на клиенте, и в
+// юните одинаковым и сами проверяем rows.length >= ROW_LIMIT. Если упрёмся —
+// статистика/фильтры/карта считаются по НЕПОЛНОМУ набору, поэтому показываем
+// видимый баннер, а не только console.warn.
+const ROW_LIMIT = 80000;
+
+function showTruncationBanner(n) {
+  const el = document.getElementById("trunc-banner");
+  if (!el) return;
+  el.textContent = `⚠ Загружены только первые ${n.toLocaleString("ru-RU")} ` +
+    `квартир (лимит сервера). Статистика и фильтры неполны — поднимите ` +
+    `max_returned_rows в deploy/kvadstat.service.`;
+  el.style.display = "block";
+}
+
+const fmtMoney = (cell) => {
+  const v = cell.getValue();
+  if (v === null || v === undefined || v === "") return "";
+  return Number(v).toLocaleString("ru-RU") + " ₽";
+};
+const fmtMeter = (cell) => {
+  const v = cell.getValue();
+  if (v === null || v === undefined || v === "") return "";
+  return Number(v).toLocaleString("ru-RU") + " ₽/м²";
+};
+const fmtPct = (cell) => {
+  const v = cell.getValue();
+  if (v === null || v === undefined || v === "") return "";
+  if (v === 0) return "—";
+  return Number(v).toFixed(1) + "%";
+};
+const fmtBaseWithStrike = (cell) => {
+  const v = cell.getValue();
+  if (v === null || v === undefined || v === "") return "";
+  const row = cell.getRow().getData();
+  const text = Number(v).toLocaleString("ru-RU") + " ₽";
+  if (row["промо"] === 1) {
+    return `<span class="struck">${text}</span>`;
+  }
+  return text;
+};
+const fmtPromoBadge = (cell) => {
+  return cell.getValue() === 1 ? `<span class="promo-badge">скидка</span>` : "";
+};
+const fmtLink = (cell) => {
+  const href = safeUrl(cell.getValue());   // только http(s); js:/data: → ""
+  if (!href) return "";
+  let host = "сайт";
+  try { host = new URL(href).hostname.replace(/^www\./, ""); } catch (_) {}
+  return `<a href="${escapeAttr(href)}" target="_blank" rel="noopener">${escapeHtml(host)} ↗</a>`;
+};
+
+// «Заселение» приходит в РАЗНЫХ форматах от разных API:
+//   ПИК/А101:  «2026-08-30»  · Level: «1 кв. 2025»  · MR Group: «I кв. 2027»
+//   А101 verbose: «I квартал 2027 г.»  · Абсолют: «I кв. 2028»
+// Сводим к единому виду «Q3 2026» — короткий, читаемый, сортируемый.
+const fmtSettle = (v) => {
+  if (!v) return "";
+  let m;
+  // ISO 2026-08-30 → квартал
+  if ((m = v.match(/^(\d{4})-(\d{2})/))) {
+    return `Q${Math.floor((parseInt(m[2])-1)/3) + 1} ${m[1]}`;
+  }
+  // Roman: «I кв. 2027», «II квартал 2025 г.»
+  if ((m = v.match(/^([IVX]+)\s*кв/))) {
+    const q = {I:1,II:2,III:3,IV:4}[m[1]] || m[1];
+    const y = (v.match(/(\d{4})/) || [])[1] || "";
+    return `Q${q} ${y}`.trim();
+  }
+  // Arabic: «3 кв. 2026»
+  if ((m = v.match(/^(\d)\s*кв/))) {
+    const y = (v.match(/(\d{4})/) || [])[1] || "";
+    return `Q${m[1]} ${y}`.trim();
+  }
+  // Just year «2027»
+  if ((m = v.match(/^(\d{4})$/))) return m[1];
+  return v.slice(0, 10);
+};
+// Числовой ключ для сортировки «Q3 2026» → 20263 (год*10 + квартал)
+const fmtSettleSort = (v) => {
+  if (!v) return 0;
+  const f = fmtSettle(v);
+  const m = f.match(/Q(\d)\s+(\d{4})/);
+  if (m) return parseInt(m[2])*10 + parseInt(m[1]);
+  const y = f.match(/(\d{4})/);
+  return y ? parseInt(y[1])*10 + 2 : 0;
+};
+
+// Подписи кодов городов — синхронно с CITY_CENTERS в kvadstat/geo.py
+const CITY_LABELS = {
+  msk: "Москва", mo: "МО", spb: "СПб", ekb: "Екб",
+  kazan: "Казань", nn: "Н.Новгород", yaroslavl: "Ярославль",
+  vladivostok: "Владивосток", khabarovsk: "Хабаровск",
+  novorossiisk: "Новороссийск", "yuzhno-sakhalinsk": "Ю-Сахалинск",
+  "ulan-ude": "Улан-Удэ", blagoveshchensk: "Благовещенск",
+  krasnodar: "Краснодар", tyumen: "Тюмень", obninsk: "Обнинск",
+  kaluga: "Калуга", ufa: "Уфа", chelyabinsk: "Челябинск",
+  nsk: "Новосибирск", surgut: "Сургут", omsk: "Омск",
+  kurgan: "Курган", lipetsk: "Липецк", perm: "Пермь",
+  other: "другое",
+};
+const cityLabel = (code) => CITY_LABELS[code] || code || "";
+
+// Палитра для бейджей класса ЖК — от дешёвого (серо-зелёный) к дорогому (золото)
+const KLASS_COLORS = {
+  "эконом":  "#64748b",
+  "комфорт": "#0f766e",
+  "бизнес":  "#2563eb",
+  "премиум": "#7c3aed",
+  "элит":    "#b45309",
+};
+
+// Палитра для бейджей застройщиков — стабильные цвета по имени
+const DEV_COLORS = {
+  "ПИК":      "#0f766e",
+  "А101":     "#7c3aed",
+  "Донстрой": "#dc2626",
+  "Абсолют":  "#ea580c",
+  "Level":    "#2563eb",
+  "ГК ФСК":   "#65a30d",
+  "MR Group": "#0891b2",
+  "Гранель":  "#9333ea",
+  "Инград":   "#0284c7",
+  "Брусника": "#be123c",
+};
+const fmtDeveloper = (cell) => {
+  const v = cell.getValue();
+  if (!v) return "";
+  const color = DEV_COLORS[v] || "#6b7280";   // color из фиксированной карты, не из данных
+  return `<span style="background:${color};color:white;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:600">${escapeHtml(v)}</span>`;
+};
+
+const rowFormatter = (row) => {
+  if (row.getData()["промо"] === 1) {
+    row.getElement().classList.add("promo-row");
+  }
+};
+
+// 4_000_000_153_513 → "40153513": offset (1 цифра) + native (с лидирующими
+// нулями до 7 знаков). Глобальный id всё ещё используется в `/flat.html?id=`
+// (полная точность сохраняется), здесь только косметика в ячейке.
+const NS = 1_000_000_000_000;
+const shortId = (id) => {
+  if (id == null) return "";
+  const off = Math.floor(id / NS), nat = id % NS;
+  return off === 0 ? String(nat) : off + String(nat).padStart(7, "0");
+};
+
+const columns = [
+  {title: "ID", field: "id", width: 72, hozAlign: "right", headerHozAlign: "right",
+   headerFilter: "input", formatter: (c) => shortId(c.getValue())},
+  {title: "Застройщик", field: "застройщик", width: 104, hozAlign: "center", headerHozAlign: "center",
+   headerFilter: "list", formatter: fmtDeveloper,
+   headerFilterParams: {values: ["", "ПИК", "А101", "Донстрой", "Абсолют",
+                                  "Level", "ГК ФСК", "MR Group", "Гранель",
+                                  "Инград", "Брусника"]}},
+  {title: "Город", field: "город", width: 88, headerFilter: "input",
+   formatter: (c) => cityLabel(c.getValue())},
+  {title: "ЖК", field: "жк", width: 132, headerFilter: "input"},
+  {title: "Класс", field: "класс", width: 92, hozAlign: "center", headerHozAlign: "center",
+   headerFilter: "list",
+   headerFilterParams: {values: ["", "эконом", "комфорт", "бизнес", "премиум", "элит", "н/д"]},
+   formatter: (c) => {
+     const v = c.getValue();
+     if (!v || v === "н/д") return '<span style="color:var(--muted)">—</span>';
+     const color = KLASS_COLORS[v] || "#6b7280";
+     return `<span class="dev-tag" style="background:${color}">${escapeHtml(v)}</span>`;
+   }},
+  {title: "Метро", field: "метро", width: 120, headerFilter: "input",
+   formatter: (c) => {
+     const r = c.getRow().getData();
+     const name = c.getValue();
+     if (!name) return "";
+     const type = r["тип_транспорта"];
+     const typeMark = type && type !== "M" ? `<span class="metro-type">${escapeHtml(type)}</span>` : '';
+     return `${typeMark}${escapeHtml(name)}`;
+   }},
+  {title: "До метро", field: "мин_пешком", width: 78, hozAlign: "right", headerHozAlign: "right",
+   sorter: "number",
+   // Если метро не известно — НЕ рендерим «0 мин» / «N мин» (это вводит
+   // в заблуждение, выглядит как «дом прямо на станции»). Helper выше
+   // молчит для отсутствующего метро и для нулевого/null времени.
+   formatter: (c) => metroTimeText(c.getRow().getData())},
+  {title: "Линия", field: "линия", width: 120, headerFilter: "input"},
+  {title: "Км от центра", field: "км_от_центра", width: 92, hozAlign: "right", headerHozAlign: "right",
+   sorter: "number",
+   formatter: (c) => c.getValue() != null ? Number(c.getValue()).toFixed(1) + " км" : ""},
+  {title: "Комнат", field: "комнат", width: 76, hozAlign: "center", headerHozAlign: "center",
+   headerFilter: "list",
+   headerFilterParams: {valuesLookup: "all", sortValuesList: "asc"}},
+  {title: "Корпус", field: "корпус", width: 88, headerFilter: "input"},
+  {title: "Секция", field: "секция", width: 84, hozAlign: "center", headerHozAlign: "center", headerFilter: "input"},
+  {title: "Этаж", field: "этаж", width: 64, hozAlign: "center", headerHozAlign: "center",
+   sorter: "number", headerFilter: "input",
+   formatter: (c) => {
+     const r = c.getRow().getData();
+     const f = c.getValue();
+     const total = r["этажей_всего"];
+     if (f == null) return "";
+     return total ? `${f} / ${total}` : String(f);
+   }},
+  {title: "Площадь, м²", field: "площадь_м²", width: 96, hozAlign: "right", headerHozAlign: "right",
+   sorter: "number",
+   formatter: (c) => c.getValue() != null ? Number(c.getValue()).toFixed(1) : ""},
+  {title: "База", field: "базовая_цена", hozAlign: "right", headerHozAlign: "right",
+   sorter: "number", formatter: fmtBaseWithStrike, width: 175},
+  {title: "С программой", field: "цена_по_программе", hozAlign: "right", headerHozAlign: "right",
+   sorter: "number", formatter: fmtMoney, width: 195},
+  {title: "Скидка", field: "скидка_%", hozAlign: "right", headerHozAlign: "right",
+   sorter: "number", formatter: fmtPct, width: 110},
+  // (колонки «Программа» и бейджа скидки убраны — flag промо уже виден
+  // через подсветку строки .promo-row + значение в «Скидка %».)
+  {title: "База ₽/м²", field: "база_за_м²", hozAlign: "right", headerHozAlign: "right",
+   sorter: "number", formatter: fmtMeter, width: 155},
+  // Оценочная арендная ставка по моей модели (см. rentMonthly).
+  // field=id чтобы Tabulator пустил sorter; реально считаем на лету.
+  {title: "Аренда/мес", field: "id", hozAlign: "right", headerHozAlign: "right",
+   width: 130, headerSort: true,
+   sorter: (a, b, aRow, bRow) => {
+     const ra = rentMonthly(aRow.getData()) || 0;
+     const rb = rentMonthly(bRow.getData()) || 0;
+     return ra - rb;
+   },
+   tooltip: (e, c) => rentTooltip(c.getRow().getData()),
+   formatter: (c) => {
+     const rent = rentMonthly(c.getRow().getData());
+     return rent == null ? "" :
+       `<span style="color:#475569">~${Math.round(rent/1000)}к ₽</span>`;
+   }},
+  {title: "Отделка", field: "отделка", width: 132,
+   headerFilter: "list", headerFilterParams: {valuesLookup: "all", sortValuesList: "asc"}},
+  {title: "Заселение", field: "заселение", width: 90, hozAlign: "center", headerHozAlign: "center",
+   sorter: (a, b) => fmtSettleSort(a) - fmtSettleSort(b),
+   formatter: (c) => fmtSettle(c.getValue())},
+  {title: "Статус", field: "статус", width: 84, hozAlign: "center", headerHozAlign: "center",
+   headerFilter: "list", headerFilterParams: {valuesLookup: "all", sortValuesList: "asc"}},
+  {title: "30 дн", field: "id", hozAlign: "center", headerHozAlign: "center",
+   width: 100, headerSort: false,
+   tooltip: (e, c) => {
+     const h = sparklineByFlat[c.getValue()];
+     if (!h || h.length < 2) return "истории за 30 дней нет";
+     const first = h[0], last = h[h.length - 1];
+     const pct = first > 0 ? ((last - first) / first * 100).toFixed(1) : "?";
+     const arrow = last > first ? "↑" : last < first ? "↓" : "→";
+     return `${h.length} точек: от ${(first/1e6).toFixed(2)}М до ${(last/1e6).toFixed(2)}М (${arrow} ${pct}%)`;
+   },
+   formatter: (c) => renderInlineSparkline(sparklineByFlat[c.getValue()])},
+  {title: "График", field: "id", hozAlign: "center", headerHozAlign: "center",
+   width: 56, headerSort: false,
+   formatter: (c) => {
+     const id = Number(c.getValue());   // id числовой — Number() режет любую инъекцию в query
+     return Number.isFinite(id) ? `<a href="/flat.html?id=${id}" target="_blank" rel="noopener">📈</a>` : "";
+   }},
+  {title: "План", field: "планировка", width: 52, hozAlign: "center", headerHozAlign: "center",
+   headerSort: false,
+   formatter: (c) => {
+     const v = safeUrl(c.getValue());   // план приходит из API застройщика — гейтим схему
+     return v ? `<a href="${escapeAttr(v)}" target="_blank" rel="noopener" title="${escapeAttr(v)}">📐</a>` : "";
+   }},
+  {title: "Сайт", field: "ссылка", width: 64, hozAlign: "center", headerHozAlign: "center",
+   formatter: fmtLink, headerSort: false},
+];
+
+let table;
+let allRows = [];
+// Множественный выбор комнатности. Пустой набор = «все». Спец-ключ «4+»
+// матчит 4-комнатные и больше.
+let selectedRooms = new Set();
+function roomMatches(roomVal) {
+  if (selectedRooms.size === 0) return true;
+  if (selectedRooms.has(roomVal)) return true;
+  if (selectedRooms.has("4+")) {
+    const m = /^(\d+)к$/.exec(roomVal || "");
+    if (m && +m[1] >= 4) return true;
+  }
+  return false;
+}
+function syncRoomButtons() {
+  document.querySelectorAll(".controls button[data-rooms]").forEach(b => {
+    const k = b.dataset.rooms;
+    b.classList.toggle("active", k === "all" ? selectedRooms.size === 0 : selectedRooms.has(k));
+  });
+}
+// Множественный выбор класса ЖК. Пустой набор = «все».
+let selectedClasses = new Set();
+function classMatches(klassVal) {
+  if (selectedClasses.size === 0) return true;
+  return selectedClasses.has(klassVal);
+}
+function syncClassButtons() {
+  document.querySelectorAll(".controls button[data-klass]").forEach(b => {
+    b.classList.toggle("active", selectedClasses.has(b.dataset.klass));
+  });
+}
+let currentCity = "all";
+let currentZk = "all";
+let currentDev = "all";
+let promoOnly = false;
+let hideApart = true;   // апартаменты — нежилой фонд, по умолчанию прячем
+let areaMin = null;
+let areaMax = null;
+let priceMin = null;  // в МИЛЛИОНАХ ₽ (поле в шапке вводят как «5», «18»)
+let priceMax = null;
+// Расширенный набор (popover «Все фильтры»):
+let metroMin = null, metroMax = null;          // минут пешком до метро
+let distMin = null, distMax = null;            // км от центра
+let floorMin = null, floorMax = null;          // этаж от-до
+let settleYearMax = null;                      // заселение не позже (число года)
+let finishFilter = "all";                      // отделка (точное совпадение)
+let onlyFree = false;                          // только статус «свободные»
+let hasMetro = false;                          // только с известным метро
+
+// «{N} мин» или "" если станция/время не известны. До 2026-05-25 рендерили
+// «0 мин» даже когда метро вообще нет — путало юзеров (выглядело как «дом
+// прямо на станции»). Теперь молчим: нет метро → нет данных о времени.
+function metroTimeText(r) {
+  if (!r || !r["метро"]) return "";
+  const t = r["мин_пешком"];
+  if (t == null || t <= 0) return "";
+  return t + " мин";
+}
+
+// Парсим год заселения из произвольной строки источника. У PIK это
+// ISO-дата ("2027-10-31"), у Гранели — «3 кв. 2026», у Брусники — «3
+// квартал 2026», и т.д. Regex берёт первый 20XX-год — годится для всех.
+function settlementYear(s) {
+  if (!s) return null;
+  const m = String(s).match(/(20\d{2})/);
+  return m ? parseInt(m[1], 10) : null;
+}
+const COLS_LS_KEY = "kvadstat:hidden_cols:v2";  // v2: дефолт прячет линию/секцию
+// Колонки, скрытые по умолчанию на первом визите (нет записи в localStorage):
+// «линия» метро и «секция» редко нужны и загромождают таблицу. Пользователь
+// с уже сохранённым набором сохраняет свой выбор. ВАЖНО: ключи скрытия —
+// в формате `${field}__${idx}` (индекс по массиву `columns`, как в
+// buildColsPanel/applyColumnVisibility), а не просто имя поля — иначе
+// hiddenCols.has(key) никогда не совпадёт. линия=idx6, секция=idx10.
+const DEFAULT_HIDDEN_COLS = ["линия__6", "секция__10"];
+const _savedCols = localStorage.getItem(COLS_LS_KEY);
+const hiddenCols = new Set(_savedCols ? JSON.parse(_savedCols) : DEFAULT_HIDDEN_COLS);
+
+// ─── Сохранённые поиски (localStorage) ───────────────────────
+// Хранит снапшоты состояния фильтров под понятным именем. Сохраняем
+// все 10 переменных-фильтров: dev/city/zk/room + price/area-from/to
+// + promoOnly + hideApart.
+const SAVED_LS_KEY = "kvadstat:saved_searches:v1";
+
+// Приведение к Number с проверкой; не-число / NaN / Infinity → null.
+const numOrNull = (v) => {
+  if (v == null || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+function readSaved() {
+  let raw;
+  try { raw = JSON.parse(localStorage.getItem(SAVED_LS_KEY) || "[]"); }
+  catch (_) { return []; }
+  if (!Array.isArray(raw)) return [];
+  // Защита от битых записей (старая схема, ручная правка storage)
+  return raw.filter(x =>
+    x && typeof x === "object" && typeof x.name === "string"
+    && x.filters && typeof x.filters === "object"
+  );
+}
+function writeSaved(list) {
+  // Quota / private-mode Safari / отключённый storage — silent-swallow,
+  // но в консоль предупреждение. Иначе click-handler упадёт и UI зависнет.
+  try {
+    localStorage.setItem(SAVED_LS_KEY, JSON.stringify(list));
+    return true;
+  } catch (e) {
+    console.warn("saved searches: не удалось записать", e);
+    return false;
+  }
+}
+function snapshotFilters() {
+  return {
+    dev: currentDev, city: currentCity, zk: currentZk, rooms: [...selectedRooms],
+    classes: [...selectedClasses],
+    priceMin, priceMax, areaMin, areaMax, promoOnly, hideApart,
+    metroMin, metroMax, distMin, distMax, floorMin, floorMax,
+    settleYearMax, finishFilter, onlyFree, hasMetro,
+  };
+}
+function applySnapshot(s) {
+  currentDev = s.dev ?? "all";
+  currentCity = s.city ?? "all";
+  currentZk = s.zk ?? "all";
+  // комнатность: множественный выбор. Принимаем новый формат `rooms` (массив)
+  // и legacy `room` (строка). Оставляем только ключи, для которых есть кнопка
+  // в DOM (иначе фильтр висел бы «невидимым»).
+  const roomBtns = [...document.querySelectorAll(".controls button[data-rooms]")];
+  const validRooms = new Set(roomBtns.map(b => b.dataset.rooms));
+  const wanted = Array.isArray(s.rooms)
+    ? s.rooms
+    : (s.room && s.room !== "all" ? [s.room] : []);
+  selectedRooms = new Set(wanted.filter(k => validRooms.has(k) && k !== "all"));
+  // класс ЖК: множественный выбор. Оставляем только ключи с кнопкой в DOM.
+  const classBtns = [...document.querySelectorAll(".controls button[data-klass]")];
+  const validClasses = new Set(classBtns.map(b => b.dataset.klass));
+  selectedClasses = new Set((Array.isArray(s.classes) ? s.classes : []).filter(k => validClasses.has(k)));
+  // Числовые фильтры — через numOrNull, иначе строка "5,3" → NaN-фильтр
+  priceMin = numOrNull(s.priceMin);
+  priceMax = numOrNull(s.priceMax);
+  areaMin = numOrNull(s.areaMin);
+  areaMax = numOrNull(s.areaMax);
+  promoOnly = !!s.promoOnly;
+  // hideApart дефолт true (так же как стартовое значение приложения)
+  hideApart = s.hideApart !== undefined ? !!s.hideApart : true;
+  // Расширенный набор фильтров — все опциональны, отсутствие = null/false/"all"
+  metroMin = numOrNull(s.metroMin);
+  metroMax = numOrNull(s.metroMax);
+  distMin = numOrNull(s.distMin);
+  distMax = numOrNull(s.distMax);
+  floorMin = numOrNull(s.floorMin);
+  floorMax = numOrNull(s.floorMax);
+  settleYearMax = numOrNull(s.settleYearMax);
+  finishFilter = typeof s.finishFilter === "string" && s.finishFilter ? s.finishFilter : "all";
+  onlyFree = !!s.onlyFree;
+  hasMetro = !!s.hasMetro;
+  // Прокатываем по DOM
+  for (const [id, val] of [["devFilter", currentDev], ["cityFilter", currentCity]]) {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  }
+  // zk-dropdown пересоберётся rebuildZkDropdown'ом, но он берёт prevValue
+  // из sel.value — поэтому сначала кладём option на лету, чтобы DOM-state
+  // соответствовал переменной до пересборки.
+  const zkSel = document.getElementById("zkFilter");
+  if (zkSel && currentZk !== "all"
+      && ![...zkSel.options].some(o => o.value === currentZk)) {
+    const opt = document.createElement("option");
+    opt.value = currentZk; opt.textContent = currentZk;
+    zkSel.appendChild(opt);
+  }
+  if (zkSel) zkSel.value = currentZk;
+  for (const [id, val] of [["priceMin", priceMin], ["priceMax", priceMax],
+                            ["areaMin", areaMin], ["areaMax", areaMax],
+                            ["metroMin", metroMin], ["metroMax", metroMax],
+                            ["distMin", distMin], ["distMax", distMax],
+                            ["floorMin", floorMin], ["floorMax", floorMax]]) {
+    const el = document.getElementById(id);
+    if (el) el.value = val ?? "";
+  }
+  const p = document.getElementById("promoOnly");
+  if (p) p.checked = promoOnly;
+  const h = document.getElementById("hideApart");
+  if (h) h.checked = hideApart;
+  const sy = document.getElementById("settleYearMax");
+  if (sy) sy.value = settleYearMax ?? "";
+  const ff = document.getElementById("finishFilter");
+  if (ff) ff.value = finishFilter;
+  const of = document.getElementById("onlyFree");
+  if (of) of.checked = onlyFree;
+  const hm = document.getElementById("hasMetro");
+  if (hm) hm.checked = hasMetro;
+  syncRoomButtons();
+  syncClassButtons();
+  updateMoreFiltersBadge();
+  applyFilter();
+}
+
+function renderSavedPanel() {
+  const panel = document.getElementById("savedPanel");
+  const items = readSaved();
+  panel.innerHTML = "";
+  if (!items.length) {
+    const empty = document.createElement("div");
+    empty.className = "saved-empty";
+    empty.textContent = "Пока ничего не сохранено. Настрой фильтры и нажми «Сохранить».";
+    panel.appendChild(empty);
+  }
+  items.forEach((item, idx) => {
+    const row = document.createElement("div");
+    row.className = "saved-item";
+    const labelBtn = document.createElement("button");
+    labelBtn.type = "button";
+    labelBtn.className = "label";
+    labelBtn.style.cssText = "background:transparent;border:none;cursor:pointer;text-align:left;padding:0";
+    labelBtn.textContent = item.name;
+    labelBtn.addEventListener("click", () => {
+      applySnapshot(item.filters);
+      panel.classList.remove("open");
+    });
+    const del = document.createElement("button");
+    del.type = "button"; del.className = "del";
+    del.textContent = "✕"; del.title = "Удалить";
+    del.style.cssText = "border:none;background:transparent;cursor:pointer";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const list = readSaved();
+      list.splice(idx, 1);
+      writeSaved(list);
+      renderSavedPanel();
+    });
+    row.appendChild(labelBtn); row.appendChild(del);
+    panel.appendChild(row);
+  });
+  // Форма «сохранить текущий»
+  const actions = document.createElement("div");
+  actions.className = "saved-actions";
+  const input = document.createElement("input");
+  input.type = "text"; input.placeholder = "название поиска";
+  input.maxLength = 50;
+  const saveBtn = document.createElement("button");
+  saveBtn.type = "button"; saveBtn.textContent = "Сохранить";
+  const save = () => {
+    const name = input.value.trim();
+    if (!name) return;
+    const list = readSaved();
+    // если имя уже есть — обновляем (а не дублируем)
+    const existing = list.findIndex(x => x.name === name);
+    const entry = { name, filters: snapshotFilters(), at: Date.now() };
+    if (existing >= 0) list[existing] = entry;
+    else list.push(entry);
+    if (!writeSaved(list)) {
+      alert("Не удалось сохранить — браузер блокирует localStorage " +
+            "(приватный режим / квота исчерпана).");
+      return;
+    }
+    input.value = "";
+    renderSavedPanel();
+  };
+  saveBtn.addEventListener("click", save);
+  input.addEventListener("keydown", (e) => { if (e.key === "Enter") save(); });
+  actions.appendChild(input); actions.appendChild(saveBtn);
+  panel.appendChild(actions);
+}
+
+// ─── Оценочная арендная ставка (порт Python-модели из аналитики) ─
+// Это ОЦЕНКА, не реальная ставка от арендатора. Используется как
+// сравнительный показатель «во сколько ориентировочно выйдет» — для
+// быстрого скана инвест-привлекательности.
+// Калибровано против Москвы 2026 для эконом/комфорт-новостроек.
+const RENT_BASE_M2 = { "студия": 1900, "1к": 1700, "2к": 1500, "3к": 1300,
+                       "4к": 1150, "5к": 1000, "6к": 900, "7к": 800, "8к": 700 };
+const RENT_CITY_F = { msk: 1.00, mo: 0.65, spb: 0.70, ekb: 0.50, kazan: 0.45,
+                       nn: 0.45, yaroslavl: 0.35, vladivostok: 0.55, khabarovsk: 0.45,
+                       novorossiisk: 0.40, "yuzhno-sakhalinsk": 0.50, "ulan-ude": 0.35,
+                       blagoveshchensk: 0.40, krasnodar: 0.50, tyumen: 0.45,
+                       obninsk: 0.40, kaluga: 0.35, ufa: 0.40, chelyabinsk: 0.40,
+                       nsk: 0.50, surgut: 0.55, omsk: 0.40,
+                       kurgan: 0.30, lipetsk: 0.35, perm: 0.45,
+                       other: 0.40 };
+const RENT_DEV_LIQ = { "ПИК": 1.05, "Донстрой": 1.03, "Level": 1.00, "А101": 0.98,
+                       "Абсолют": 0.96, "ГК ФСК": 0.98, "MR Group": 0.95,
+                       "Гранель": 0.98, "Инград": 1.00, "Брусника": 1.00 };
+
+function rentFactors(r) {
+  // Вынесено отдельно: и расчёт, и tooltip используют одни и те же
+  // множители (никакого рассинхрона при изменении логики).
+  const base = RENT_BASE_M2[r["комнат"]];
+  const area = Number(r["площадь_м²"]);
+  if (!base || !Number.isFinite(area) || area <= 0) return null;
+  const city = RENT_CITY_F[r["город"]] ?? 0.4;
+  let dist = 1.0;
+  const d = r["км_от_центра"];
+  if (d != null) {
+    dist = d < 3 ? 1.30 : d < 6 ? 1.20 : d < 10 ? 1.10
+         : d < 14 ? 1.00 : d < 22 ? 0.92 : 0.80;
+  }
+  let metro = 1.0;
+  const foot = r["мин_пешком"];
+  if (foot != null) {
+    metro = foot <= 5 ? 1.15 : foot <= 10 ? 1.10 : foot <= 15 ? 1.00 : 0.95;
+  }
+  let floor = 1.0;
+  const fl = r["этаж"], total = r["этажей_всего"];
+  if (fl != null) {
+    if (fl === 1) floor = 0.87;
+    else if (fl === 2) floor = 0.95;
+    else if (total && fl === total) floor = 0.94;
+    else if (total && total >= 16 && fl >= total - 1) floor = 0.96;
+    else if (fl >= 6 && fl <= 15) floor = 1.02;
+  }
+  const dev = RENT_DEV_LIQ[r["застройщик"]] ?? 1.0;
+  // Апартаменты сдаются на 5-10% дешевле (нет прописки, выше комм-платежи)
+  const apart = r["апартаменты"] ? 0.92 : 1.0;
+  return { base, area, city, dist, metro, floor, dev, apart };
+}
+
+function rentMonthly(r) {
+  const f = rentFactors(r);
+  if (!f) return null;
+  return Math.round(f.base * f.area * f.city * f.dist * f.metro * f.floor * f.dev * f.apart);
+}
+
+function rentTooltip(r) {
+  const f = rentFactors(r);
+  if (!f) return "недостаточно данных для оценки";
+  const rent = Math.round(f.base * f.area * f.city * f.dist * f.metro * f.floor * f.dev * f.apart);
+  // УСН-6% считается на gross-выручку, vacancy и opex — тоже от gross.
+  // Корректно: net = gross × (1 − vacancy − opex − tax) = gross × 0.77
+  const gross = rent * 12;
+  const net = Math.round(gross * (1 - 0.12 - 0.05 - 0.06));
+  // Yield от БАЗОВОЙ цены (инвестор cash платит за неё, а не за promo-price)
+  const flatPrice = r["базовая_цена"] || r["цена_по_программе"];
+  const yieldNet = flatPrice ? (net / flatPrice * 100).toFixed(1) : "?";
+  const apartLine = r["апартаменты"] ? `× апартаменты: ×${f.apart.toFixed(2)}\n` : "";
+  return (
+    `Оценка аренды ${rent.toLocaleString("ru-RU")} ₽/мес.\n\n` +
+    `База: ${f.base} ₽/м² × ${f.area.toFixed(1)} м²\n` +
+    `× город (${cityLabel(r["город"]) || "?"}): ×${f.city.toFixed(2)}\n` +
+    `× дистанция (${r["км_от_центра"] != null ? r["км_от_центра"].toFixed(1) + " км" : "?"}): ×${f.dist.toFixed(2)}\n` +
+    `× метро (${r["мин_пешком"] != null ? r["мин_пешком"] + " мин" : "?"}): ×${f.metro.toFixed(2)}\n` +
+    `× этаж: ×${f.floor.toFixed(2)}\n` +
+    `× застройщик (${r["застройщик"]}): ×${f.dev.toFixed(2)}\n` +
+    apartLine +
+    `\nЧистыми (vacancy 12% + opex 5% + УСН 6% от gross): ${(net/1e6).toFixed(2)}М ₽/год\n` +
+    `Доходность net от базовой цены: ${yieldNet}%`
+  );
+}
+
+// ─── Inline sparkline в колонке таблицы (последние 30 дней) ──
+// Lookup {flat_id → [price1, price2, ...]} наполняется async-ом из view
+// flat_sparkline_30d. До прихода данных формат-функция вернёт «·».
+const sparklineByFlat = Object.create(null);
+
+function renderInlineSparkline(history) {
+  if (!history || history.length < 2) {
+    return `<span style="color:#cbd5e1">·</span>`;
+  }
+  const W = 80, H = 22;
+  // arrayMin/Max — без spread, защита от V8/Safari arg-limit при больших rows
+  const yMin = arrayMin(history), yMax = arrayMax(history);
+  const yRng = (yMax - yMin) || 1;
+  const n = history.length;
+  const pts = history.map((y, i) =>
+    `${(i / (n - 1) * (W - 4) + 2).toFixed(1)},` +
+    `${(H - 2 - (y - yMin) / yRng * (H - 4)).toFixed(1)}`
+  ).join(" ");
+  // Раскраска тренда. Цена: рост=красный (дороже), падение=зелёный (дешевле).
+  // Остаток ЖК — та же логика «падение=зелёный» читается верно: остаток ПАДАЕТ
+  // = квартиры раскупают (ликвидно, хорошо) = зелёный; РАСТЁТ = затоварен
+  // (плохо) = красный.
+  const diff = history[n - 1] - history[0];
+  const color = diff > 0 ? "#dc2626" : diff < 0 ? "#16a34a" : "#94a3b8";
+  return `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" ` +
+    `style="display:block;margin:0 auto"><polyline points="${pts}" ` +
+    `fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+}
+
+async function loadSparklines() {
+  try {
+    // Лимит общий с today_all (ROW_LIMIT) и с max_returned_rows в юните.
+    // В _shape=array Datasette не возвращает флаг усечения — проверяем сами.
+    const resp = await fetch(`/kvadstat/flat_sparkline_30d.json?_shape=array&_size=${ROW_LIMIT}`);
+    if (!resp.ok) { console.warn("sparklines: HTTP", resp.status); return; }
+    const rows = await resp.json();
+    if (rows.length >= ROW_LIMIT) {
+      console.warn(`sparklines: достигнут лимит ${ROW_LIMIT}, часть квартир без графика`);
+    }
+    for (const r of rows) {
+      // Datasette сейчас отдаёт TEXT-колонку json_group_array как строку.
+      // Если в будущем парсит сам (плагин / 1.0+) — типа array; принимаем оба.
+      let prices = r.prices;
+      try {
+        if (typeof prices === "string") prices = JSON.parse(prices);
+      } catch (_) { continue; }
+      if (Array.isArray(prices) && prices.length >= 2) {
+        sparklineByFlat[r.flat_id] = prices;
+      }
+    }
+    // redraw БЕЗ force — не сбрасывает scroll/sort/filter, в Tabulator
+    // virtual-DOM этого достаточно для перерисовки видимых ячеек.
+    if (table) table.redraw();
+  } catch (e) {
+    console.warn("sparklines: load failed", e);
+  }
+}
+
+// ─── Боковая панель деталей квартиры ─────────────────────────
+// Open by clicking row; close by ✕, ESC, или overlay click. Подгружает
+// историю цены этой квартиры через /kvadstat/snapshots.json (отдельный fetch
+// на открытие — не предзагружаем для всех 20k чтобы не раздувать payload).
+let detailReqToken = 0;     // монотонный счётчик для отсева stale-ответов истории
+let detailReturnFocus = null;  // куда вернуть фокус при закрытии (a11y)
+
+function openDetail(row, trigger) {
+  if (!row) return;
+  const panel = document.getElementById("detailPanel");
+  const overlay = document.getElementById("detailOverlay");
+  detailReturnFocus = trigger || document.activeElement;
+  document.getElementById("detailTitle").textContent =
+    `${row["жк"]} · ${row["комнат"]} · ${Number(row["площадь_м²"]).toFixed(1)} м²`;
+  document.getElementById("detailBody").innerHTML = renderDetail(row);
+  panel.classList.add("open"); overlay.classList.add("open");
+  panel.setAttribute("aria-hidden", "false");
+  overlay.setAttribute("aria-hidden", "false");
+  loadPriceHistory(row.id);
+  panel.querySelector(".detail-close").focus();
+}
+function closeDetail() {
+  const panel = document.getElementById("detailPanel");
+  const overlay = document.getElementById("detailOverlay");
+  panel.classList.remove("open"); overlay.classList.remove("open");
+  panel.setAttribute("aria-hidden", "true");
+  overlay.setAttribute("aria-hidden", "true");
+  // Bump токен — любой in-flight loadPriceHistory отбросит свой ответ.
+  detailReqToken++;
+  // Очищаем body, иначе старый sparkline мелькнёт при повторном открытии.
+  const body = document.getElementById("detailBody");
+  if (body) body.innerHTML = "";
+  // Возвращаем фокус на trigger (a11y); если null — body, как было.
+  if (detailReturnFocus && typeof detailReturnFocus.focus === "function") {
+    try { detailReturnFocus.focus(); } catch (_) {}
+  }
+  detailReturnFocus = null;
+}
+
+// Минимальный focus trap внутри панели — Tab по кругу между focusable.
+function trapFocusInDetail(e) {
+  if (e.key !== "Tab") return;
+  const panel = document.getElementById("detailPanel");
+  if (!panel.classList.contains("open")) return;
+  const focusable = panel.querySelectorAll(
+    "a[href], button:not([disabled]), input, [tabindex]:not([tabindex='-1'])"
+  );
+  if (!focusable.length) return;
+  const first = focusable[0], last = focusable[focusable.length - 1];
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault(); last.focus();
+  } else if (!e.shiftKey && document.activeElement === last) {
+    e.preventDefault(); first.focus();
+  }
+}
+
+// Только https/http — блокирует javascript:/data: атаки в href/src,
+// если когда-нибудь сторонний парсер засунет такое в ссылку/план.
+function safeUrl(s) {
+  if (s == null) return "";
+  const u = String(s).trim();
+  return /^https?:\/\//i.test(u) ? u : "";
+}
+
+function renderDetail(r) {
+  const fmtRub = (n) => n == null ? "—" : Number(n).toLocaleString("ru-RU") + " ₽";
+  // Number() гарантирует .toFixed работает даже если в БД попала строка
+  const fmtFix = (n, d = 1) => {
+    const x = Number(n); return Number.isFinite(x) ? x.toFixed(d) : "—";
+  };
+  // escape для произвольных не-числовых значений из БД (поля могут быть
+  // строками из HTML-парсинга сторонних застройщиков — доверять нельзя)
+  const E = (v) => escapeHtml(v == null ? "—" : String(v));
+  const Eraw = (v) => escapeHtml(String(v == null ? "" : v));
+  const base = r["базовая_цена"], program = r["цена_по_программе"];
+  const hasDisc = r["промо"] === 1 && base && program && base > program;
+  const discPct = Number(r["скидка_%"]) || 0;
+  const priceBlock = hasDisc
+    ? `<div class="detail-price-row">
+         <span>${E(fmtRub(program))}</span>
+         <span class="struck">${E(fmtRub(base))}</span>
+         ${discPct >= 0.5 ? `<span class="detail-discount-badge">−${discPct.toFixed(0)}%</span>` : ""}
+       </div>`
+    : `<div class="detail-price-row"><span>${E(fmtRub(base || program))}</span></div>`;
+  const ppm = r["база_за_м²"] || (base && r["площадь_м²"] ? Math.round(base/r["площадь_м²"]) : null);
+  // metroTimeText сам подавит «0/null мин» — отдельная проверка не нужна,
+  // но строку «N мин пешком» здесь хотим длиннее, чем helper («N мин»).
+  const metroTime = metroTimeText(r);
+  const metroLine = r["метро"]
+    ? `${E(r["метро"])}${metroTime ? " · " + Eraw(metroTime.replace(" мин", "")) + " мин пешком" : ""}`
+    : "—";
+  const settle = fmtSettle(r["заселение"]) || "—";
+  const planUrl = safeUrl(r["планировка"]);
+  const siteUrl = safeUrl(r["ссылка"]);
+  const planImg = planUrl
+    ? `<img class="detail-plan" src="${escapeAttr(planUrl)}" alt="планировка" loading="lazy">`
+    : "";
+  const linkSite = siteUrl
+    ? `<a href="${escapeAttr(siteUrl)}" target="_blank" rel="noopener">Открыть на сайте</a>`
+    : "";
+  const linkHistory = Number.isFinite(Number(r.id))
+    ? `<a class="secondary" href="/flat.html?id=${Number(r.id)}" target="_blank" rel="noopener">График цены</a>`
+    : "";
+  const linkPlan = planUrl
+    ? `<a class="secondary" href="${escapeAttr(planUrl)}" target="_blank" rel="noopener">Открыть план</a>`
+    : "";
+  const floorStr = r["этаж"] != null
+    ? Eraw(r["этаж"]) + (r["этажей_всего"] != null ? " / " + Eraw(r["этажей_всего"]) : "")
+    : "—";
+  return `
+    <div class="detail-section">
+      ${priceBlock}
+      ${ppm ? `<div style="color:var(--muted);font-size:13px;margin-top:6px">${E(fmtRub(ppm))}/м²</div>` : ""}
+    </div>
+
+    <div class="detail-section">
+      <h3>История цены за 90 дней</h3>
+      <svg id="detailChart" class="detail-chart" viewBox="0 0 480 140" preserveAspectRatio="none"></svg>
+    </div>
+
+    ${planImg ? `<div class="detail-section"><h3>Планировка</h3>${planImg}</div>` : ""}
+
+    <div class="detail-section">
+      <h3>Локация</h3>
+      <div class="detail-kv">
+        <div class="k">Город</div><div class="v">${E(cityLabel(r["город"]))}</div>
+        <div class="k">Метро</div><div class="v">${metroLine}</div>
+        <div class="k">Линия</div><div class="v">${E(r["линия"])}</div>
+        <div class="k">Км от центра</div><div class="v">${r["км_от_центра"] != null ? fmtFix(r["км_от_центра"], 1) + " км" : "—"}</div>
+        <div class="k">Адрес</div><div class="v">${E(r["адрес"])}</div>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h3>Квартира</h3>
+      <div class="detail-kv">
+        <div class="k">Застройщик</div><div class="v">${E(r["застройщик"])}</div>
+        <div class="k">ЖК</div><div class="v">${E(r["жк"])}</div>
+        <div class="k">Класс</div><div class="v">${r["класс"] && r["класс"] !== "н/д" ? E(r["класс"]) : "—"}</div>
+        <div class="k">Корпус</div><div class="v">${E(r["корпус"])}</div>
+        <div class="k">Секция</div><div class="v">${E(r["секция"])}</div>
+        <div class="k">Этаж</div><div class="v">${floorStr}</div>
+        <div class="k">Площадь</div><div class="v">${r["площадь_м²"] != null ? fmtFix(r["площадь_м²"], 1) + " м²" : "—"}</div>
+        <div class="k">Отделка</div><div class="v">${E(r["отделка"])}</div>
+        <div class="k">Заселение</div><div class="v">${E(settle)}</div>
+        <div class="k">Артикул</div><div class="v">${E(r["артикул"])}</div>
+      </div>
+    </div>
+
+    <div class="detail-section detail-actions">
+      ${linkSite} ${linkHistory} ${linkPlan}
+    </div>
+  `;
+}
+
+// Простейшие escape-helper'ы (внутри HTML и в значениях атрибутов).
+function escapeHtml(s) {
+  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function escapeAttr(s) { return escapeHtml(s); }
+
+// История цены — последние 90 дней. Request token защищает от stale-ответа
+// (юзер быстро переключился на другую квартиру). _sort_desc + scan_date__gte
+// гарантируют именно СВЕЖИЕ 90 дней, не первые 200 ever.
+async function loadPriceHistory(flatId) {
+  const myToken = ++detailReqToken;
+  const svg = document.getElementById("detailChart");
+  if (!svg) return;
+  if (!Number.isFinite(Number(flatId))) return;
+  svg.innerHTML = `<text x="240" y="70" text-anchor="middle" fill="#94a3b8" font-size="12">загрузка…</text>`;
+  // ISO «90 дней назад», UTC — Datasette с SQLite сравнит лексикографически
+  const since = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0, 10);
+  const url = `/kvadstat/snapshots.json?flat_id=${Number(flatId)}` +
+              `&scan_date__gte=${since}` +
+              `&_sort_desc=scan_date&_size=200&_shape=array`;
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    let rows = await resp.json();
+    if (myToken !== detailReqToken) return;  // stale — другая квартира уже открыта
+    rows = rows.slice().reverse();  // _sort_desc → переворачиваем в ASC
+    if (!rows.length) {
+      svg.innerHTML = `<text x="240" y="70" text-anchor="middle" fill="#94a3b8" font-size="12">истории нет</text>`;
+      return;
+    }
+    drawSparkline(svg, rows);
+  } catch (e) {
+    if (myToken !== detailReqToken) return;
+    svg.innerHTML = `<text x="240" y="70" text-anchor="middle" fill="#94a3b8" font-size="12">ошибка: ${escapeHtml(e.message)}</text>`;
+  }
+}
+
+function drawSparkline(svg, snapshots) {
+  // snapshots: [{scan_date, price, ...}, ...] sorted asc
+  const W = 480, H = 140, PAD_L = 56, PAD_R = 16, PAD_T = 12, PAD_B = 24;
+  // scan_date — ISO «YYYY-MM-DD…»; берём первые 10 символов как day-bucket,
+  // не строим Date (избегаем TZ-сюрпризов между парсингом и подписями).
+  const data = snapshots
+    .filter(s => s.price != null && s.scan_date)
+    .map(s => ({
+      day: String(s.scan_date).slice(0, 10),
+      // дни от 1970-01-01 — целое, годится для линейной x-шкалы
+      x: Math.floor(Date.UTC(
+        +s.scan_date.slice(0, 4),
+        +s.scan_date.slice(5, 7) - 1,
+        +s.scan_date.slice(8, 10)
+      ) / 86400_000),
+      y: Number(s.price),
+    }))
+    .filter(d => Number.isFinite(d.x) && Number.isFinite(d.y));
+  if (data.length === 0) {
+    svg.innerHTML = `<text x="240" y="70" text-anchor="middle" fill="#94a3b8" font-size="12">нет данных по цене</text>`;
+    return;
+  }
+  const xs = data.map(d => d.x), ys = data.map(d => d.y);
+  const xMin = arrayMin(xs), xMax = arrayMax(xs);
+  const yMin = arrayMin(ys), yMax = arrayMax(ys);
+  const xRng = (xMax - xMin) || 1;
+  const yRng = (yMax - yMin) || 1;
+  const tx = (x) => PAD_L + (x - xMin) / xRng * (W - PAD_L - PAD_R);
+  const ty = (y) => H - PAD_B - (y - yMin) / yRng * (H - PAD_T - PAD_B);
+  const pts = data.map(d => `${tx(d.x).toFixed(1)},${ty(d.y).toFixed(1)}`).join(" ");
+  const fmtPriceShort = (n) => (n / 1e6).toFixed(1) + "М";
+  // При >60 точек кружочки сливаются — скрываем
+  const showDots = data.length <= 60;
+  const dayFirst = data[0].day, dayLast = data[data.length - 1].day;
+  svg.innerHTML = `
+    <polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="2"/>
+    ${showDots ? data.map(d => `<circle cx="${tx(d.x).toFixed(1)}" cy="${ty(d.y).toFixed(1)}" r="2.5" fill="#2563eb"/>`).join("") : ""}
+    <text x="6" y="${PAD_T + 4}" font-size="10" fill="#94a3b8">${fmtPriceShort(yMax)}</text>
+    <text x="6" y="${H - PAD_B + 2}" font-size="10" fill="#94a3b8">${fmtPriceShort(yMin)}</text>
+    <text x="${PAD_L}" y="${H - 6}" font-size="10" fill="#94a3b8">${escapeHtml(dayFirst)}</text>
+    <text x="${W - PAD_R}" y="${H - 6}" font-size="10" fill="#94a3b8" text-anchor="end">${escapeHtml(dayLast)}</text>
+  `;
+}
+
+// Generic debounce — на keystroke в полях цена/площадь applyFilter
+// пересобирает Tabulator (20k rows) или Yandex маркеры (130 ЖК) — без
+// дебаунса заметно лагает при наборе. 200 мс — комфорт vs реактивность.
+function debounce(fn, ms = 200) {
+  let t;
+  return function (...args) {
+    clearTimeout(t);
+    t = setTimeout(() => fn.apply(this, args), ms);
+  };
+}
+
+// ─────────────────── КАРТА (Leaflet + OpenStreetMap) ───────────────────
+// Принципы:
+// — Leaflet грузится сразу (как Tabulator) — без API-ключа, без лимитов;
+//   раньше был Yandex JS API без apikey, который Yandex теперь отклоняет
+//   («apikey … required»), и карта всегда падала в «недоступна»;
+// — один маркер на ЖК (не на квартиру) — 130 ЖК Leaflet тянет без кластера;
+// — цвет маркера по avg ₽/м² (зелёный=дешевле, красный=дороже) в РАМКАХ
+//   текущего фильтра — динамический градиент;
+// — клик по маркеру → popup с кнопкой «Открыть в таблице» (фильтрует ЖК).
+let viewMode = "table";
+let map = null;
+let mapMarkersLayer = null;
+let blocksGeo = null;
+let blocksGeoPromise = null;
+
+function loadBlocksGeo() {
+  if (blocksGeo) return Promise.resolve();
+  if (blocksGeoPromise) return blocksGeoPromise;
+  // _size=1000 — запас на рост (сейчас 130 ЖК); если упрёмся в лимит, логируем
+  blocksGeoPromise = fetch("/kvadstat/blocks.json?_shape=array&_size=1000")
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(arr => {
+      if (arr.length >= 1000) console.warn("blocksGeo: достигнут лимит 1000");
+      blocksGeo = {};
+      for (const b of arr) {
+        if (b.latitude != null && b.longitude != null) blocksGeo[b.id] = b;
+      }
+    });
+  blocksGeoPromise.catch(() => { blocksGeoPromise = null; });
+  return blocksGeoPromise;
+}
+
+async function switchView(mode) {
+  if (mode === viewMode) return;
+  document.querySelectorAll(".view-toggle button").forEach(b => {
+    const active = b.dataset.view === mode;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-selected", active);
+  });
+  if (mode === "table") {
+    document.getElementById("map").style.display = "none";
+    document.getElementById("grid").style.display = "block";
+    viewMode = "table";
+    applyFilter();
+    return;
+  }
+  // === map ===
+  document.getElementById("grid").style.display = "none";
+  document.getElementById("map").style.display = "block";
+  viewMode = "map";
+  if (typeof L === "undefined") {
+    document.getElementById("map").innerHTML =
+      `<div class="map-placeholder">Карта не загрузилась: библиотека Leaflet ` +
+      `недоступна.<br>Попробуй обновить страницу или вернись в таблицу.</div>`;
+    return;
+  }
+  try {
+    await loadBlocksGeo();
+  } catch (e) {
+    document.getElementById("map").innerHTML =
+      `<div class="map-placeholder">Карта не загрузилась: ${escapeHtml(e.message)}.<br>` +
+      `Попробуй обновить страницу или вернись в таблицу.</div>`;
+    return;
+  }
+  // Пользователь мог переключиться обратно в таблицу пока шла загрузка
+  // данных — не инициализируем карту в скрытом контейнере (layout 0x0).
+  if (viewMode !== "map") return;
+  if (!map) {
+    map = L.map("map").setView([55.752, 37.617], 10);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: "© OpenStreetMap",
+    }).addTo(map);
+    mapMarkersLayer = L.layerGroup().addTo(map);
+  }
+  // контейнер только что стал видимым (display:none→block) — Leaflet снял
+  // размер как 0×0; пересчитываем, иначе серые/смещённые тайлы.
+  map.invalidateSize();
+  // fit=true только при входе в режим карты; при смене фильтров позицию
+  // (pan/zoom) сохраняем — иначе карта «прыгает» на каждый фильтр.
+  renderMapMarkers(filteredRows(), true);
+}
+
+function renderMapMarkers(rows, fit = false) {
+  if (!map || !mapMarkersLayer || !blocksGeo) return;
+  mapMarkersLayer.clearLayers();
+  // группировка квартир по ЖК (block_id) с пропуском неизвестных координат
+  const byBlock = new Map();
+  for (const r of rows) {
+    if (!blocksGeo[r.block_id]) continue;
+    if (!byBlock.has(r.block_id)) byBlock.set(r.block_id, []);
+    byBlock.get(r.block_id).push(r);
+  }
+  if (byBlock.size === 0) return;
+  // avg ₽/м² на ЖК
+  const flatPrice = (r) => r["цена_по_программе"] || r["базовая_цена"];
+  const stats = [];
+  for (const [bid, brs] of byBlock) {
+    const ppm = brs.map(r => flatPrice(r) / (r["площадь_м²"] || 1)).filter(x => x > 0);
+    if (!ppm.length) continue;
+    stats.push({
+      block: blocksGeo[bid],
+      count: brs.length,
+      minPrice: arrayMin(brs.map(flatPrice).filter(Boolean)),
+      avgPpm: ppm.reduce((a, b) => a + b, 0) / ppm.length,
+    });
+  }
+  if (!stats.length) return;
+  const ppms = stats.map(s => s.avgPpm);
+  const minPpm = arrayMin(ppms), maxPpm = arrayMax(ppms);
+  const range = (maxPpm - minPpm) || 1;
+  const latlngs = [];
+  for (const s of stats) {
+    // range=0 (все одинаковые) → нейтрально-синий, иначе 120°→0° (зелёный→красный)
+    const hue = range === 0 ? 210 : Math.round(120 * (1 - (s.avgPpm - minPpm) / range));
+    const color = `hsl(${hue},65%,45%)`;
+    const minP = (s.minPrice / 1e6).toFixed(1);
+    const avgP = Math.round(s.avgPpm).toLocaleString("ru-RU");
+    // Number(...) гарантия что id безопасен для интерполяции (XSS-defence)
+    const safeId = Number(s.block.id) || 0;
+    const ll = [s.block.latitude, s.block.longitude];
+    latlngs.push(ll);
+    const marker = L.circleMarker(ll, {
+      radius: 8, color: "#fff", weight: 1.5,
+      fillColor: color, fillOpacity: 0.9,
+    });
+    marker.bindPopup(
+      `<b>${escapeHtml(s.block.name)}</b><br>` +
+      `${s.count} квартир в выборке<br>` +
+      `от <b>${minP} М ₽</b><br>` +
+      `средняя <b>${avgP} ₽/м²</b><br>` +
+      `<button data-action="filter-block" data-block-id="${safeId}" ` +
+      `style="margin-top:6px;padding:4px 10px;background:#2563eb;color:white;` +
+      `border:none;border-radius:4px;cursor:pointer">Открыть в таблице</button>`
+    );
+    marker.bindTooltip(`${escapeHtml(s.block.name)}: ${s.count} кв., от ${minP} М`);
+    mapMarkersLayer.addLayer(marker);
+  }
+  // Авто-центрирование только при первом показе карты (fit=true). При смене
+  // фильтров сохраняем текущую позицию пользователя.
+  if (fit) {
+    // Одна точка → fitBounds уходит в max zoom. Явно центрируем; иначе fit.
+    if (latlngs.length === 1) {
+      map.setView(latlngs[0], 14);
+    } else {
+      map.fitBounds(latlngs, { padding: [40, 40] });
+    }
+  }
+}
+
+// Делегированный click на balloon-кнопке. data-block-id безопасен (Number()),
+// слушатель один на весь document — не утечёт при пересборке маркеров.
+document.addEventListener("click", (e) => {
+  const btn = e.target.closest && e.target.closest("[data-action='filter-block']");
+  if (!btn || !blocksGeo) return;
+  const blockId = Number(btn.dataset.blockId);
+  const zhk = (blocksGeo[blockId] || {}).name;
+  if (!zhk) return;
+  currentZk = zhk;
+  const sel = document.getElementById("zkFilter");
+  if (![...sel.options].some(o => o.value === zhk)) {
+    const opt = document.createElement("option");
+    opt.value = zhk; opt.textContent = zhk;
+    sel.appendChild(opt);
+  }
+  sel.value = zhk;
+  switchView("table");
+});
+
+// Вычисляет отфильтрованный набор; не трогает UI. Используется и таблицей,
+// и картой (карта тоже должна реагировать на фильтры).
+function filteredRows() {
+  let rows = allRows;
+  if (currentDev !== "all") rows = rows.filter(r => r["застройщик"] === currentDev);
+  if (currentCity !== "all") rows = rows.filter(r => r["город"] === currentCity);
+  if (currentZk !== "all") rows = rows.filter(r => r["жк"] === currentZk);
+  if (selectedRooms.size > 0) rows = rows.filter(r => roomMatches(r["комнат"]));
+  if (selectedClasses.size > 0) rows = rows.filter(r => classMatches(r["класс"]));
+  if (promoOnly) rows = rows.filter(r => r["промо"] === 1);
+  if (hideApart) rows = rows.filter(r => !r["апартаменты"]);
+  if (areaMin != null) rows = rows.filter(r => r["площадь_м²"] != null && r["площадь_м²"] >= areaMin);
+  if (areaMax != null) rows = rows.filter(r => r["площадь_м²"] != null && r["площадь_м²"] <= areaMax);
+  // Цена в фильтре — миллионы; фильтруем по «итоговой» (с программой если есть,
+  // иначе базовой). Так пользователь ищет «что я реально заплачу».
+  const flatPrice = (r) => r["цена_по_программе"] || r["базовая_цена"];
+  if (priceMin != null) rows = rows.filter(r => flatPrice(r) != null && flatPrice(r) >= priceMin * 1e6);
+  if (priceMax != null) rows = rows.filter(r => flatPrice(r) != null && flatPrice(r) <= priceMax * 1e6);
+  // ── Расширенный набор фильтров (panel «Все фильтры») ──────────
+  // До метро: 0/null обрабатываем как «нет данных»; range фильтрует только
+  // квартиры с известным временем — для тех у кого метро не найдено
+  // фильтр исключает. Это сознательно: пользователь, ищущий «до 10 мин»,
+  // не хочет видеть лоты с НЕИЗВЕСТНЫМ временем (они скорее всего далеко).
+  if (metroMin != null) rows = rows.filter(r => r["мин_пешком"] != null && r["мин_пешком"] > 0 && r["мин_пешком"] >= metroMin);
+  if (metroMax != null) rows = rows.filter(r => r["мин_пешком"] != null && r["мин_пешком"] > 0 && r["мин_пешком"] <= metroMax);
+  if (distMin != null) rows = rows.filter(r => r["км_от_центра"] != null && r["км_от_центра"] >= distMin);
+  if (distMax != null) rows = rows.filter(r => r["км_от_центра"] != null && r["км_от_центра"] <= distMax);
+  if (floorMin != null) rows = rows.filter(r => r["этаж"] != null && r["этаж"] >= floorMin);
+  if (floorMax != null) rows = rows.filter(r => r["этаж"] != null && r["этаж"] <= floorMax);
+  if (settleYearMax != null) {
+    rows = rows.filter(r => {
+      const y = settlementYear(r["заселение"]);
+      return y != null && y <= settleYearMax;
+    });
+  }
+  if (finishFilter !== "all") rows = rows.filter(r => r["отделка"] === finishFilter);
+  if (onlyFree) rows = rows.filter(r => r["статус"] === "free");
+  if (hasMetro) rows = rows.filter(r => !!r["метро"]);
+  return rows;
+}
+
+// Счётчик активных «extra»-фильтров для бейджа на кнопке «Все фильтры».
+function updateMoreFiltersBadge() {
+  const badge = document.getElementById("moreFiltersCount");
+  if (!badge) return;
+  let n = 0;
+  if (metroMin != null) n++;
+  if (metroMax != null) n++;
+  if (distMin != null) n++;
+  if (distMax != null) n++;
+  if (floorMin != null) n++;
+  if (floorMax != null) n++;
+  if (settleYearMax != null) n++;
+  if (finishFilter !== "all") n++;
+  if (onlyFree) n++;
+  if (hasMetro) n++;
+  badge.textContent = n;
+  badge.classList.toggle("active", n > 0);
+}
+
+// Mobile-detection — гейт для тяжёлой работы: на desktop рендерить карточки
+// бессмысленно (CSS прячет их), на мобиле — обратное.
+const isMobile = () => window.matchMedia("(max-width: 768px)").matches;
+
+function applyFilter() {
+  const rows = filteredRows();
+  if (viewMode === "table") {
+    table.replaceData(rows);
+    // Карточки рендерим ТОЛЬКО на мобилке (на desktop #cardList скрыт CSS,
+    // зачем плодить 80 DOM-узлов на каждый keystroke).
+    if (isMobile()) renderCardList(rows);
+  } else if (viewMode === "map") {
+    renderMapMarkers(rows);
+  }
+  document.getElementById("stats").innerHTML = renderStats(rows);
+  rebuildZkDropdown(rows);
+}
+
+// Минималистичная карточка для мобильного. Показываем только то, что
+// помещается в палец: ЖК, площадь/комнаты, цена, метро, кнопки.
+// На мобиле лимит до 80 карточек (>80 — пользователь явно перефильтрует),
+// иначе DOM становится тяжёлым.
+function renderCardList(rows) {
+  const list = document.getElementById("cardList");
+  if (!list) return;
+  const limit = 80;
+  const items = rows.slice(0, limit);
+  if (!items.length) {
+    list.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted)">Ничего не найдено по фильтрам</div>`;
+    return;
+  }
+  const E = escapeHtml;
+  const html = items.map((r) => {
+    const color = DEV_COLORS[r["застройщик"]] || "#6b7280";
+    const base = r["базовая_цена"], program = r["цена_по_программе"];
+    const hasDisc = r["промо"] === 1 && base && program && base > program;
+    const priceTxt = hasDisc
+      ? `${(program/1e6).toFixed(2)} М ₽ <span class="struck">${(base/1e6).toFixed(2)} М</span>`
+      : `${((base||program||0)/1e6).toFixed(2)} М ₽`;
+    const metroTimeStr = metroTimeText(r);  // "N мин" or ""
+    const metro = r["метро"]
+      ? `${E(r["метро"])}${metroTimeStr ? " · " + metroTimeStr : ""}`
+      : "—";
+    const settle = fmtSettle(r["заселение"]) || "—";
+    const floor = r["этаж"] != null
+      ? r["этаж"] + (r["этажей_всего"] ? " / " + r["этажей_всего"] : "") + " эт"
+      : "—";
+    const rent = rentMonthly(r);
+    return (
+      `<div class="card${hasDisc ? " promo-card" : ""}" data-row-id="${Number(r.id)||0}">` +
+        `<div class="card-head">` +
+          `<span class="dev-tag" style="background:${color}">${E(r["застройщик"])}</span>` +
+          `<span class="zhk">${E(r["жк"])}</span>` +
+        `</div>` +
+        `<div class="card-price">${priceTxt}</div>` +
+        `<div class="card-meta">` +
+          `<div>${E(r["комнат"])} · <b>${Number(r["площадь_м²"]).toFixed(1)} м²</b></div>` +
+          `<div>${floor}</div>` +
+          `<div>🚇 <b>${metro}</b></div>` +
+          `<div>${settle}</div>` +
+          `<div>📐 ${E(r["отделка"] || "—")}</div>` +
+          `<div>${rent != null ? "~" + Math.round(rent/1000) + "к/мес" : ""}</div>` +
+        `</div>` +
+      `</div>`
+    );
+  }).join("");
+  const footer = rows.length > limit
+    ? `<div style="text-align:center;padding:14px;color:var(--muted);font-size:12px">+${rows.length - limit} ещё (уточни фильтры)</div>`
+    : "";
+  list.innerHTML = html + footer;
+}
+
+function buildColsPanel() {
+  const panel = document.getElementById("colsPanel");
+  panel.innerHTML = "";
+  const seen = new Set();
+  columns.forEach((col, idx) => {
+    const field = col.field;
+    const title = col.title || field;
+    if (!field) return;
+    // дубликат поля (id используется в "ID" и в "График") — отличаем по индексу
+    const key = `${field}__${idx}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const wrap = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !hiddenCols.has(key);
+    cb.addEventListener("change", () => {
+      if (cb.checked) hiddenCols.delete(key);
+      else hiddenCols.add(key);
+      localStorage.setItem(COLS_LS_KEY, JSON.stringify([...hiddenCols]));
+      applyColumnVisibility();
+    });
+    wrap.appendChild(cb);
+    const txt = document.createElement("span");
+    txt.textContent = title || "(без названия)";
+    wrap.appendChild(txt);
+    wrap.dataset.colKey = key;
+    panel.appendChild(wrap);
+  });
+
+  const actions = document.createElement("div");
+  actions.className = "cols-actions";
+  const showAll = document.createElement("button");
+  showAll.type = "button"; showAll.textContent = "Показать все";
+  showAll.addEventListener("click", () => {
+    hiddenCols.clear();
+    localStorage.setItem(COLS_LS_KEY, "[]");
+    panel.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+    applyColumnVisibility();
+  });
+  actions.appendChild(showAll);
+  panel.appendChild(actions);
+}
+
+function applyColumnVisibility() {
+  if (!table) return;
+  const seen = new Set();
+  columns.forEach((col, idx) => {
+    const field = col.field;
+    if (!field) return;
+    const key = `${field}__${idx}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    const tcols = table.getColumns();
+    // ищем колонку по совпадению field+title (защита от дублей field)
+    const match = tcols.find(c => c.getField() === field && (c.getDefinition().title || "") === (col.title || ""));
+    if (!match) return;
+    if (hiddenCols.has(key)) match.hide();
+    else match.show();
+  });
+}
+
+function rebuildZkDropdown(rows) {
+  const zks = [...new Set(rows.map(r => r["жк"]).filter(Boolean))].sort();
+  const sel = document.getElementById("zkFilter");
+  const prevValue = sel.value;
+  sel.innerHTML = '<option value="all">все</option>';
+  for (const z of zks) {
+    const opt = document.createElement("option");
+    opt.value = z; opt.textContent = z;
+    if (z === prevValue) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  // Если выбранный ЖК исчез из пула (юзер сменил dev/city или применил
+  // saved-search с устаревшим ЖК) — сбрасываем И переменную, И select,
+  // чтобы фильтр не висел невидимым «по призраку».
+  if (prevValue !== "all" && !zks.includes(prevValue)) {
+    currentZk = "all";
+    sel.value = "all";
+  }
+}
+
+// Math.min(...arr) / Math.max(...arr) спред-вариант роняет JS engine
+// при больших массивах: V8 limit ~125k аргументов, Safari ~65k. На лэндинге
+// 36k+ квартир уже близко к границе; через год при росте до 70k+
+// один запрос upgrade'нул бы страницу в RangeError. Используем reduce
+// — O(n) проход без раскрытия в стек.
+function arrayMin(arr) {
+  let m = Infinity;
+  for (const x of arr) if (x < m) m = x;
+  return m === Infinity ? 0 : m;
+}
+function arrayMax(arr) {
+  let m = -Infinity;
+  for (const x of arr) if (x > m) m = x;
+  return m === -Infinity ? 0 : m;
+}
+
+function renderStats(rows) {
+  if (!rows.length) return "<span>0 квартир</span>";
+  const promo = rows.filter(r => r["промо"] === 1).length;
+  const prices = rows.map(r => r["базовая_цена"]).filter(Boolean);
+  // prices.length === 0 при rows.length > 0 — реальный случай: набор
+  // строк с null-ценой (старые архивные снапшоты или вышедшие из продажи
+  // лоты). Раньше выводили «0 – 0 ₽» и NaN в average; теперь честно «—».
+  if (prices.length === 0) {
+    const date0 = rows[0]["дата_среза"] || "—";
+    return `
+      <span><b>${new Set(rows.map(r => r["жк"])).size}</b> ЖК</span>
+      <span><b>${rows.length}</b> квартир</span>
+      <span>цена: <b>—</b></span>
+      <span>со скидкой: <b>${promo}</b></span>
+      <span>срез: <b>${date0}</b></span>
+    `;
+  }
+  const min = arrayMin(prices), max = arrayMax(prices);
+  const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+  const date = rows[0]["дата_среза"] || "—";
+  const zkCount = new Set(rows.map(r => r["жк"])).size;
+  return `
+    <span><b>${zkCount}</b> ЖК</span>
+    <span><b>${rows.length}</b> квартир</span>
+    <span>цена: <b>${min.toLocaleString("ru-RU")}</b> – <b>${max.toLocaleString("ru-RU")}</b> ₽</span>
+    <span>средняя: <b>${avg.toLocaleString("ru-RU")}</b> ₽</span>
+    <span>со скидкой: <b>${promo}</b></span>
+    <span>срез: <b>${date}</b></span>
+  `;
+}
+
+async function load() {
+  const resp = await fetch(`/kvadstat/today_all.json?_shape=array&_size=${ROW_LIMIT}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const rows = await resp.json();
+  allRows = rows;
+  if (rows.length >= ROW_LIMIT) showTruncationBanner(rows.length);
+
+  // Populate developer dropdown — порядок «ПИК сначала» (offset 0), затем
+  // по убыванию числа квартир, чтобы наиболее заполненные шли вверх
+  const devCounts = rows.reduce((acc, r) => {
+    const d = r["застройщик"]; if (d) acc[d] = (acc[d] || 0) + 1;
+    return acc;
+  }, {});
+  const devs = Object.entries(devCounts).sort((a, b) => b[1] - a[1]);
+  const devSel = document.getElementById("devFilter");
+  for (const [d, n] of devs) {
+    const opt = document.createElement("option");
+    opt.value = d; opt.textContent = `${d} (${n})`;
+    devSel.appendChild(opt);
+  }
+  devSel.addEventListener("change", (e) => {
+    currentDev = e.target.value;
+    currentZk = "all";
+    applyFilter();
+  });
+
+  // Populate city dropdown — сортируем по числу объектов (по убыванию),
+  // крупнейшие города (Москва, МО) сверху; счётчик показываем в подписи.
+  const cityCounts = new Map();
+  for (const r of rows) {
+    const c = r["город"];
+    if (c) cityCounts.set(c, (cityCounts.get(c) || 0) + 1);
+  }
+  const cities = [...cityCounts.keys()].sort(
+    (a, b) => cityCounts.get(b) - cityCounts.get(a) || cityLabel(a).localeCompare(cityLabel(b)));
+  const citySel = document.getElementById("cityFilter");
+  for (const c of cities) {
+    const opt = document.createElement("option");
+    opt.value = c; opt.textContent = `${cityLabel(c)} (${cityCounts.get(c)})`;
+    citySel.appendChild(opt);
+  }
+  // По умолчанию показываем Москву (если есть в данных) — основной рынок.
+  if (cityCounts.has("msk")) {
+    currentCity = "msk";
+    citySel.value = "msk";
+  }
+  citySel.addEventListener("change", (e) => {
+    currentCity = e.target.value;
+    currentZk = "all";
+    applyFilter();
+  });
+  // Populate ЖК-фильтр (initially all)
+  rebuildZkDropdown(rows);
+  document.getElementById("zkFilter").addEventListener("change", (e) => {
+    currentZk = e.target.value;
+    applyFilter();
+  });
+
+  table = new Tabulator("#grid", {
+    data: rows,
+    columns,
+    layout: "fitData",
+    height: "calc(100vh - 230px)",
+    rowFormatter,
+    initialSort: [{column: "базовая_цена", dir: "asc"}],
+    pagination: false,
+    persistence: false,
+  });
+  // Click по любой строке таблицы → открыть боковую панель деталей.
+  // Игнорируем клики по ссылкам/кнопкам внутри ячеек (План, Сайт, История).
+  // Запускаем async-загрузку sparkline-данных в фоне — таблица сразу
+  // рендерится без графиков, через 1-2 сек ячейки колонки «30 дн»
+  // оживут (table.redraw(true) в конце loadSparklines).
+  loadSparklines();
+
+  table.on("rowClick", (e, row) => {
+    if (e.target && e.target.closest("a, button")) return;
+    // Если юзер выделил текст внутри ячейки — не открываем панель
+    if (window.getSelection && window.getSelection().toString().length) return;
+    openDetail(row.getData(), e.target && e.target.closest("tr") || e.target);
+  });
+  // Click на мобильной карточке: открыть detail-панель (тот же UX как desktop).
+  document.getElementById("cardList").addEventListener("click", (e) => {
+    const card = e.target.closest && e.target.closest(".card");
+    if (!card) return;
+    if (e.target.closest("a, button")) return;
+    if (window.getSelection && window.getSelection().toString().length) return;
+    const id = Number(card.dataset.rowId);
+    if (!id) return;
+    const row = allRows.find(r => r.id === id);
+    if (row) openDetail(row, card);
+  });
+
+  table.on("tableBuilt", () => {
+    applyColumnVisibility();
+    applyFilter();
+  });
+
+  document.querySelectorAll(".controls button[data-rooms]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const clicked = btn.dataset.rooms;
+      if (clicked === "all") {
+        // «все» — сбрасывает множественный выбор
+        selectedRooms.clear();
+      } else if (selectedRooms.has(clicked)) {
+        // повторный клик снимает эту комнатность
+        selectedRooms.delete(clicked);
+      } else {
+        // добавляем к выбору (можно несколько одновременно)
+        selectedRooms.add(clicked);
+      }
+      syncRoomButtons();
+      applyFilter();
+    });
+  });
+  // Класс ЖК — множественный выбор (toggle), как комнатность
+  document.querySelectorAll(".controls button[data-klass]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const clicked = btn.dataset.klass;
+      if (selectedClasses.has(clicked)) selectedClasses.delete(clicked);
+      else selectedClasses.add(clicked);
+      syncClassButtons();
+      applyFilter();
+    });
+  });
+  // Цена от/до — оба поля живут синхронно, debounce на keystroke
+  const onPriceChange = debounce(() => {
+    const a = document.getElementById("priceMin").value.trim();
+    const b = document.getElementById("priceMax").value.trim();
+    priceMin = a === "" ? null : Number(a);
+    priceMax = b === "" ? null : Number(b);
+    applyFilter();
+  });
+  document.getElementById("priceMin").addEventListener("input", onPriceChange);
+  document.getElementById("priceMax").addEventListener("input", onPriceChange);
+
+  // Helper: сбросить только extra-фильтры (используется и Reset-кнопкой,
+  // и кнопкой «Сбросить эти» внутри popover'а).
+  function resetExtraFilters() {
+    metroMin = metroMax = distMin = distMax = floorMin = floorMax = null;
+    settleYearMax = null;
+    finishFilter = "all";
+    onlyFree = false;
+    hasMetro = false;
+    for (const id of ["metroMin","metroMax","distMin","distMax",
+                       "floorMin","floorMax"]) {
+      const el = document.getElementById(id);
+      if (el) el.value = "";
+    }
+    document.getElementById("settleYearMax").value = "";
+    document.getElementById("finishFilter").value = "all";
+    document.getElementById("onlyFree").checked = false;
+    document.getElementById("hasMetro").checked = false;
+    updateMoreFiltersBadge();
+  }
+
+  // ✕ Сбросить — обнуляем все переменные, dropdown'ы и инпуты.
+  // hideApart НЕ сбрасываем (это безопасный дефолт «без апартаментов»).
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    currentDev = currentCity = currentZk = "all";
+    selectedRooms.clear();
+    selectedClasses.clear();
+    promoOnly = false;
+    priceMin = priceMax = areaMin = areaMax = null;
+    for (const id of ["devFilter","cityFilter","zkFilter"])
+      document.getElementById(id).value = "all";
+    for (const id of ["priceMin","priceMax","areaMin","areaMax"])
+      document.getElementById(id).value = "";
+    document.getElementById("promoOnly").checked = false;
+    syncRoomButtons();
+    syncClassButtons();
+    resetExtraFilters();
+    applyFilter();
+  });
+
+  document.getElementById("promoOnly").addEventListener("change", (e) => {
+    promoOnly = e.target.checked;
+    applyFilter();
+  });
+  document.getElementById("hideApart").addEventListener("change", (e) => {
+    hideApart = e.target.checked;
+    applyFilter();
+  });
+  // Toggle Таблица / Карта
+  document.querySelectorAll(".view-toggle button").forEach(b => {
+    b.addEventListener("click", () => switchView(b.dataset.view));
+  });
+  // CSV-экспорт текущей выборки. bom:true — Excel правильно откроет
+  // UTF-8 русские заголовки. Скачивается только то что сейчас в таблице
+  // (replaceData(filteredRows) гарантирует).
+  document.getElementById("exportBtn").addEventListener("click", () => {
+    if (!table) return;
+    const date = new Date().toISOString().slice(0, 10);
+    const dev = currentDev !== "all" ? "-" + currentDev : "";
+    const rooms = selectedRooms.size > 0 ? "-" + [...selectedRooms].join("_") : "";
+    const klass = selectedClasses.size > 0 ? "-" + [...selectedClasses].join("_") : "";
+    const name = `квартиры-${date}${dev}${rooms}${klass}.csv`.replace(/\s+/g, "_");
+    table.download("csv", name, { bom: true, delimiter: ";" });
+  });
+  // Resize: при переходе desktop↔mobile перерендериваем карточки если
+  // нужно (CSS уже переключил видимость, а DOM-узлы могут быть пустые).
+  let resizeT;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeT);
+    resizeT = setTimeout(() => {
+      if (isMobile()) renderCardList(filteredRows());
+    }, 250);
+  });
+  // Первый рендер карточек если стартовали на мобилке
+  if (isMobile()) renderCardList(filteredRows());
+  // Боковая панель деталей: закрытие
+  document.querySelector("#detailPanel .detail-close")
+    .addEventListener("click", closeDetail);
+  // Overlay click — закрываем ТОЛЬКО если mousedown тоже был на overlay
+  // (drag-select копирования из панели не должен закрывать).
+  const overlay = document.getElementById("detailOverlay");
+  let overlayDownOnSelf = false;
+  overlay.addEventListener("mousedown", (e) => {
+    overlayDownOnSelf = e.target === overlay;
+  });
+  overlay.addEventListener("click", (e) => {
+    if (overlayDownOnSelf && e.target === overlay) closeDetail();
+    overlayDownOnSelf = false;
+  });
+  document.addEventListener("keydown", (e) => {
+    const open = document.getElementById("detailPanel").classList.contains("open");
+    if (!open) return;
+    if (e.key === "Escape") closeDetail();
+    else trapFocusInDetail(e);
+  });
+
+  // Сохранённые поиски: открыть/закрыть панель
+  const savedBtn = document.getElementById("savedBtn");
+  const savedPanel = document.getElementById("savedPanel");
+  savedBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (!savedPanel.classList.contains("open")) renderSavedPanel();
+    savedPanel.classList.toggle("open");
+  });
+  document.addEventListener("click", (e) => {
+    if (!savedPanel.contains(e.target) && e.target !== savedBtn) {
+      savedPanel.classList.remove("open");
+    }
+  });
+
+  const onAreaChange = debounce(() => {
+    const minV = document.getElementById("areaMin").value.trim();
+    const maxV = document.getElementById("areaMax").value.trim();
+    areaMin = minV === "" ? null : Number(minV);
+    areaMax = maxV === "" ? null : Number(maxV);
+    applyFilter();
+  });
+  document.getElementById("areaMin").addEventListener("input", onAreaChange);
+  document.getElementById("areaMax").addEventListener("input", onAreaChange);
+
+  buildColsPanel();
+  const colsBtn = document.getElementById("colsBtn");
+  const colsPanel = document.getElementById("colsPanel");
+  colsBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    colsPanel.classList.toggle("open");
+  });
+  document.addEventListener("click", (e) => {
+    if (!colsPanel.contains(e.target) && e.target !== colsBtn) {
+      colsPanel.classList.remove("open");
+    }
+  });
+
+  // «Все фильтры» — fixed-панель, позицию считаем из JS под кнопкой и
+  // клампим в экран. Раньше был absolute-popover внутри .cols-wrap: при
+  // flex-wrap тулбара кнопка переносилась влево, а панель min-width:300
+  // уезжала за левый край и параметры было не видно.
+  const moreBtn = document.getElementById("moreFiltersBtn");
+  const morePanel = document.getElementById("moreFiltersPanel");
+  const positionMorePanel = () => {
+    const r = moreBtn.getBoundingClientRect();
+    morePanel.style.top = (r.bottom + 4) + "px";
+    const w = morePanel.offsetWidth || 320;
+    let left = r.left;
+    const maxLeft = window.innerWidth - w - 12;
+    if (left > maxLeft) left = maxLeft;
+    if (left < 12) left = 12;
+    morePanel.style.left = left + "px";
+  };
+  moreBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    morePanel.classList.toggle("open");
+    if (morePanel.classList.contains("open")) positionMorePanel();
+  });
+  document.addEventListener("click", (e) => {
+    // Если клик ВНУТРИ panel'а (например по input) — не закрываем.
+    // Если по самому btn — не дёргаем (его собственный handler сделает toggle).
+    if (!morePanel.contains(e.target) && e.target !== moreBtn
+        && !moreBtn.contains(e.target)) {
+      morePanel.classList.remove("open");
+    }
+  });
+  // держим панель приклеенной к кнопке при ресайзе/скролле, пока открыта
+  window.addEventListener("resize", () => {
+    if (morePanel.classList.contains("open")) positionMorePanel();
+  });
+  window.addEventListener("scroll", () => {
+    if (morePanel.classList.contains("open")) positionMorePanel();
+  }, true);
+
+  // Bindings для всех extra-полей с общим debounce.
+  const onExtraNumChange = debounce(() => {
+    const v = (id) => {
+      const el = document.getElementById(id);
+      return el && el.value.trim() !== "" ? Number(el.value) : null;
+    };
+    metroMin = v("metroMin");
+    metroMax = v("metroMax");
+    distMin = v("distMin");
+    distMax = v("distMax");
+    floorMin = v("floorMin");
+    floorMax = v("floorMax");
+    updateMoreFiltersBadge();
+    applyFilter();
+  });
+  for (const id of ["metroMin","metroMax","distMin","distMax","floorMin","floorMax"]) {
+    document.getElementById(id).addEventListener("input", onExtraNumChange);
+  }
+  document.getElementById("settleYearMax").addEventListener("change", (e) => {
+    settleYearMax = e.target.value === "" ? null : Number(e.target.value);
+    updateMoreFiltersBadge();
+    applyFilter();
+  });
+  document.getElementById("finishFilter").addEventListener("change", (e) => {
+    finishFilter = e.target.value || "all";
+    updateMoreFiltersBadge();
+    applyFilter();
+  });
+  document.getElementById("onlyFree").addEventListener("change", (e) => {
+    onlyFree = e.target.checked;
+    updateMoreFiltersBadge();
+    applyFilter();
+  });
+  document.getElementById("hasMetro").addEventListener("change", (e) => {
+    hasMetro = e.target.checked;
+    updateMoreFiltersBadge();
+    applyFilter();
+  });
+  document.getElementById("moreFiltersReset").addEventListener("click", () => {
+    resetExtraFilters();
+    applyFilter();
+  });
+
+  const last = rows[0]?.["дата_среза"] || "—";
+  document.getElementById("footer").textContent =
+    `Источники: 10 застройщиков — ПИК, А101, Донстрой, Абсолют, Level, ` +
+    `ГК ФСК, MR Group, Гранель, Инград, Брусника. ` +
+    `Скан ежедневно в 06:00 МСК. Последний срез: ${last}.`;
+
+  // Применяем стартовый фильтр (город по умолчанию = Москва): наполняет
+  // таблицу, статистику и список ЖК согласованно.
+  applyFilter();
+
+  // ── Velocity / вкладка ЖК / роутинг по вкладкам ──────────────
+  [blockVel, invByBlock] = await Promise.all([loadBlockVelocity(), loadInventory()]);
+  zhkList = buildZhkList();
+  setupZhkControls();
+  setupTabs();
+  applyHash();
+}
+
+// ════════════ Вкладки, Главная, ЖК (velocity) ════════════════════
+let blockVel = {};       // block_id → строка block_velocity
+let invByBlock = {};     // block_id → [{scan_date, listed, reserved}]
+let zhkList = [];        // объединённый список ЖК (velocity + цены)
+
+function loadBlockVelocity() {
+  return fetch("/kvadstat/block_velocity.json?_shape=array&_size=5000")
+    .then(r => r.ok ? r.json() : [])
+    .then(arr => Object.fromEntries(arr.map(b => [b.block_id, b])))
+    .catch(() => ({}));
+}
+function loadInventory() {
+  return fetch("/kvadstat/block_inventory_daily.json?_shape=array&_size=80000")
+    .then(r => r.ok ? r.json() : [])
+    .then(arr => {
+      const m = {};
+      for (const x of arr) (m[x.block_id] = m[x.block_id] || []).push(x);
+      for (const k in m) m[k].sort((a, b) => a.scan_date < b.scan_date ? -1 : 1);
+      return m;
+    })
+    .catch(() => ({}));
+}
+
+const median = (a) => {
+  if (!a || !a.length) return null;
+  const s = [...a].sort((x, y) => x - y);
+  return s[Math.floor(s.length / 2)];
+};
+const fmtRub = (n) => n == null ? "—" : (n / 1e6).toFixed(1) + " млн ₽";
+
+function buildZhkList() {
+  // агрегаты цен из today_all (лучшее доступное), join с block_velocity
+  const price = {};
+  for (const r of allRows) {
+    const id = r.block_id; if (id == null) continue;
+    let e = price[id];
+    if (!e) e = price[id] = { count: 0, prices: [], meters: [], rooms: new Set(), klass: null };
+    e.count++;
+    const p = r["цена_по_программе"] || r["базовая_цена"]; if (p) e.prices.push(p);
+    if (r["база_за_м²"]) e.meters.push(r["база_за_м²"]);
+    if (r["комнат"]) e.rooms.add(r["комнат"]);
+    if (!e.klass && r["класс"]) e.klass = r["класс"];   // класс одинаков для всего ЖК
+  }
+  const out = [];
+  for (const id in blockVel) {
+    const v = blockVel[id], p = price[id] || {};
+    out.push({
+      id: +id, name: v.name || ("ЖК " + id), dev: v.developer, city: v.city,
+      metro: v.metro_name,
+      active: v.active_now || 0, absorbed30: v.absorbed_30d || 0,
+      absorbed7: v.absorbed_7d || 0, new30: v.new_30d || 0,
+      dom: v.median_dom_days, absorption: v.absorption_pct_30d,
+      coverage: v.coverage_30d || 0, status: v.block_status || "active",
+      minPrice: p.prices && p.prices.length ? arrayMin(p.prices) : null,
+      medMeter: p.meters && p.meters.length ? median(p.meters) : null,
+      rooms: p.rooms ? [...p.rooms] : [],
+      klass: p.klass || null,
+      curve: (invByBlock[id] || []).map(x => x.listed),
+    });
+  }
+  return out;
+}
+
+function zhkCardHtml(z) {
+  const lowconf = z.coverage < 50;
+  const badges = [];
+  if (z.status === "off_market") {
+    badges.push(`<span class="zk-badge off">снят с продажи</span>`);
+  } else {
+    badges.push(`<span class="zk-badge">в продаже ${z.active}</span>`);
+    if (z.absorbed30 > 0) badges.push(`<span class="zk-badge sold">−${z.absorbed30}/30д</span>`);
+    if (z.dom != null) badges.push(`<span class="zk-badge dom">~${z.dom} дн в продаже</span>`);
+    if (z.new30 > 0) badges.push(`<span class="zk-badge new">+${z.new30} новых</span>`);
+  }
+  if (lowconf) badges.push(`<span class="zk-badge lowconf">мало данных</span>`);
+  const metroTxt = z.metro ? " · м. " + escapeHtml(z.metro) : "";
+  const curve = z.curve.length >= 2
+    ? `<div class="zk-curve"><div class="cap">остаток в продаже (динамика)</div>${renderInlineSparkline(z.curve)}</div>`
+    : "";
+  const klassChip = (z.klass && z.klass !== "н/д")
+    ? ` · <span class="dev-tag" style="background:${KLASS_COLORS[z.klass] || "#6b7280"}">${escapeHtml(z.klass)}</span>`
+    : "";
+  return `<div class="zhk-card" data-zhk-id="${z.id}">
+    <div class="zk-name">${escapeHtml(z.name)}</div>
+    <div class="zk-sub">${escapeHtml(z.dev || "")}${klassChip} · ${cityLabel(z.city)}${metroTxt}</div>
+    <div class="zk-price">от ${fmtRub(z.minPrice)} <small>· ${z.medMeter ? Math.round(z.medMeter).toLocaleString("ru-RU") + " ₽/м²" : "—"}</small></div>
+    <div class="zk-badges">${badges.join("")}</div>
+    ${curve}
+  </div>`;
+}
+
+function renderZhkList() {
+  const city = document.getElementById("zhkCity").value;
+  const dev = document.getElementById("zhkDev").value;
+  const q = document.getElementById("zhkSearch").value.trim().toLowerCase();
+  const activeOnly = document.getElementById("zhkActiveOnly").checked;
+  const sort = document.getElementById("zhkSort").value;
+  let list = zhkList.filter(z => {
+    if (city !== "all" && z.city !== city) return false;
+    if (dev !== "all" && z.dev !== dev) return false;
+    if (q && !(z.name || "").toLowerCase().includes(q)) return false;
+    if (activeOnly && z.status !== "active") return false;
+    return true;
+  });
+  const cmp = {
+    absorbed: (a, b) => b.absorbed30 - a.absorbed30,
+    new: (a, b) => b.new30 - a.new30,
+    active: (a, b) => b.active - a.active,
+    dom: (a, b) => (a.dom ?? 1e9) - (b.dom ?? 1e9),
+    price: (a, b) => (a.medMeter ?? 1e15) - (b.medMeter ?? 1e15),
+    name: (a, b) => (a.name || "").localeCompare(b.name || ""),
+  }[sort];
+  list.sort(cmp);
+  document.getElementById("zhkCount").textContent = `${list.length} ЖК`;
+  document.getElementById("zhkGrid").innerHTML =
+    list.map(zhkCardHtml).join("") ||
+    `<p style="color:var(--muted)">Ничего не найдено.</p>`;
+}
+
+function openZhkDetail(id) {
+  const z = zhkList.find(x => x.id === id);
+  if (!z) return;
+  const conf = z.coverage < 50
+    ? `<div class="conf-note">⚠ Достоверность ${z.coverage}%: у застройщика мало полных сканов за 30 дней — цифры продаж приблизительны.</div>`
+    : `<div class="conf-note">Достоверность данных: ${z.coverage}% дней с полным сканом за 30 дней.</div>`;
+  const m = (num, lbl) => `<div class="metric"><div class="m-num">${num}</div><div class="m-lbl">${lbl}</div></div>`;
+  const salesBlock = z.status === "off_market"
+    ? `<p style="color:#b91c1c;font-weight:600">Снят с продажи (распродан / завершён / убран застройщиком).</p>`
+    : `<div class="metrics">
+        ${m(z.active, "в продаже сейчас")}
+        ${m("−" + z.absorbed30, "ушло за 30 дней")}
+        ${m("+" + z.new30, "новых за 30 дней")}
+        ${m(z.dom != null ? z.dom + " дн" : "—", "медиана в продаже")}
+        ${m((z.absorption ?? 0) + "%", "распродано за 30д")}
+        ${m(z.medMeter ? Math.round(z.medMeter).toLocaleString("ru-RU") : "—", "₽/м²")}
+      </div>`;
+  const curve = z.curve.length >= 2
+    ? `<div class="zk-curve"><div class="cap">Остаток в продаже по дням (падает = раскупают)</div>${renderInlineSparkline(z.curve)}</div>`
+    : `<p style="color:var(--muted)">Истории пока мало для графика.</p>`;
+  const el = document.getElementById("zhkDetail");
+  el.innerHTML = `<div class="inner">
+    <button class="dclose" type="button" aria-label="Закрыть">✕</button>
+    <h2>${escapeHtml(z.name)}</h2>
+    <div class="zk-sub" style="color:var(--muted);font-size:13px">${escapeHtml(z.dev || "")} · ${cityLabel(z.city)}${z.metro ? " · м. " + escapeHtml(z.metro) : ""}</div>
+    ${salesBlock}
+    ${curve}
+    ${conf}
+    <div style="margin-top:16px">
+      <button type="button" class="home-cta-btn" id="zhkOpenTable"
+        style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:10px 18px;cursor:pointer;font-weight:600">
+        📋 Открыть квартиры в таблице</button>
+    </div>
+  </div>`;
+  el.hidden = false;
+  el.querySelector(".dclose").onclick = () => { el.hidden = true; if (location.hash.startsWith("#zhk")) location.hash = "zhk"; };
+  el.onclick = (e) => { if (e.target === el) { el.hidden = true; if (location.hash.startsWith("#zhk")) location.hash = "zhk"; } };
+  document.getElementById("zhkOpenTable").onclick = () => openInTable(z);
+}
+
+function openInTable(z) {
+  // Фильтр объектов-таблицы — по ИМЕНИ ЖК (currentZk), но имя берём из самой
+  // today_all по block_id, а не из block_velocity: для безымянных блоков и
+  // off_market ЖК они расходятся, и фильтр по «чужому» имени дал бы пустоту →
+  // rebuildZkDropdown сбросил бы на «все» и показал ВЕСЬ город (молча).
+  const blockRows = allRows.filter(r => r.block_id === z.id);
+  if (!blockRows.length) {
+    alert(`В ЖК «${z.name}» сейчас нет квартир в актуальной выдаче ` +
+          `(снят с продажи или нет свежих данных).`);
+    return;
+  }
+  const name = blockRows[0]["жк"];        // имя ровно как в таблице
+  currentCity = blockRows[0]["город"] || "all";
+  const citySel = document.getElementById("cityFilter");
+  if ([...citySel.options].some(o => o.value === currentCity)) citySel.value = currentCity;
+  currentDev = "all"; document.getElementById("devFilter").value = "all";
+  currentZk = name;
+  const zkSel = document.getElementById("zkFilter");
+  if (![...zkSel.options].some(o => o.value === name)) {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name; zkSel.appendChild(opt);
+  }
+  zkSel.value = name;
+  document.getElementById("zhkDetail").hidden = true;
+  location.hash = "objects";
+  applyFilter();
+}
+
+function renderHomeStats() {
+  const active = zhkList.filter(z => z.status === "active");
+  const nFlats = active.reduce((s, z) => s + z.active, 0);
+  const devs = new Set(zhkList.map(z => z.dev).filter(Boolean)).size;
+  const sold30 = active.reduce((s, z) => s + z.absorbed30, 0);
+  const new30 = active.reduce((s, z) => s + z.new30, 0);
+  const depth = Math.max(0, ...Object.values(invByBlock).map(a => a.length));
+  const stat = (n, l) => `<div class="home-stat"><div class="num">${n}</div><div class="lbl">${l}</div></div>`;
+  document.getElementById("homeStats").innerHTML =
+    stat(active.length, "ЖК в продаже") +
+    stat(nFlats.toLocaleString("ru-RU"), "квартир в продаже") +
+    stat(devs, "застройщиков") +
+    stat("−" + sold30.toLocaleString("ru-RU"), "ушло с рынка за 30 дней") +
+    stat("+" + new30.toLocaleString("ru-RU"), "новых лотов за 30 дней") +
+    stat(depth + " дн", "глубина истории");
+}
+
+function setupZhkControls() {
+  const citySel = document.getElementById("zhkCity");
+  const devSel = document.getElementById("zhkDev");
+  const cityCount = {}, devCount = {};
+  for (const z of zhkList) {
+    if (z.city) cityCount[z.city] = (cityCount[z.city] || 0) + 1;
+    if (z.dev) devCount[z.dev] = (devCount[z.dev] || 0) + 1;
+  }
+  for (const [c] of Object.entries(cityCount).sort((a, b) => b[1] - a[1])) {
+    const o = document.createElement("option");
+    o.value = c; o.textContent = cityLabel(c); citySel.appendChild(o);
+  }
+  for (const [d, n] of Object.entries(devCount).sort((a, b) => b[1] - a[1])) {
+    const o = document.createElement("option");
+    o.value = d; o.textContent = `${d} (${n})`; devSel.appendChild(o);
+  }
+  // по умолчанию — Москва (как в объектах)
+  if (cityCount["msk"]) citySel.value = "msk";
+  for (const id of ["zhkCity", "zhkDev", "zhkSort", "zhkActiveOnly"])
+    document.getElementById(id).addEventListener("change", renderZhkList);
+  document.getElementById("zhkSearch").addEventListener("input", renderZhkList);
+  document.getElementById("zhkGrid").addEventListener("click", (e) => {
+    const card = e.target.closest(".zhk-card");
+    if (card) location.hash = "zhk=" + card.dataset.zhkId;
+  });
+}
+
+function switchTab(tab) {
+  document.querySelectorAll(".tabs button").forEach(b =>
+    b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tab-panel").forEach(p =>
+    p.classList.toggle("active", p.id === "tab-" + tab));
+  const vt = document.querySelector(".view-toggle");
+  if (vt) vt.style.display = tab === "objects" ? "inline-flex" : "none";
+  // секция была display:none — Tabulator/Leaflet запомнили размер 0; пересчёт
+  // после показа. Карта (если активен режим карты) требует invalidateSize,
+  // иначе серые/смещённые тайлы; switchView сюда не поможет (mode===viewMode).
+  if (tab === "objects") {
+    if (viewMode === "map" && map) setTimeout(() => map.invalidateSize(), 0);
+    else if (table) setTimeout(() => table.redraw(true), 0);
+  }
+  if (tab === "zhk") renderZhkList();
+  if (tab === "home") renderHomeStats();
+}
+
+function setupTabs() {
+  document.querySelectorAll(".tabs button").forEach(b =>
+    b.addEventListener("click", () => { location.hash = b.dataset.tab; }));
+  document.querySelectorAll("[data-go]").forEach(b =>
+    b.addEventListener("click", () => { location.hash = b.dataset.go; }));
+}
+
+function applyHash() {
+  const h = location.hash.slice(1);
+  const [tab, arg] = h.split("=");
+  const t = ["home", "zhk", "objects"].includes(tab) ? tab : "home";
+  switchTab(t);
+  const det = document.getElementById("zhkDetail");
+  if (t === "zhk" && arg) openZhkDetail(+arg);
+  else if (det) det.hidden = true;
+}
+window.addEventListener("hashchange", applyHash);
+
+load().catch((e) => {
+  document.getElementById("grid").innerHTML =
+    `<div style="padding:24px;color:#b91c1c">Ошибка загрузки: ${e}</div>`;
+});
+</script>
+</body>
+</html>

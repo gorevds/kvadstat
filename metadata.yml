@@ -1,0 +1,45 @@
+title: Цены на квартиры — топ-застройщики Москвы
+description_html: |
+  <p>Ежедневный срез цен по проектам семи застройщиков:
+  <b>ПИК</b>, <b>А101</b>, <b>Донстрой</b>, <b>Абсолют</b>,
+  <b>Level</b>, <b>ГК ФСК</b>, <b>MR Group</b>.</p>
+  <p>Витрины:
+  <a href="/">главная</a> (фильтры + графики),
+  <a href="/kvadstat/today_all">today_all</a> (сырая таблица всех квартир),
+  <a href="/kvadstat/today_one_room">today_one_room</a> (только 1-комн),
+  <a href="/kvadstat/snapshots?_sort_desc=scan_date">snapshots</a> (история цен).</p>
+  <p>Скан раз в сутки в 06:00 МСК (<code>kvadstat-scan.timer</code>) —
+  все застройщики одним проходом.</p>
+license: ODbL
+license_url: https://opendatacommons.org/licenses/odbl/
+source: API застройщиков
+source_url: https://github.com/gorevds/kvadstat
+databases:
+  kvadstat:
+    tables:
+      today_all:
+        title: Сегодня — все застройщики
+        description: "Последний срез цен по каждому ЖК (для каждого ЖК — его последний скан)."
+        facets: [застройщик, город, комнат, отделка]
+        sort_desc: дата_среза
+      today_one_room:
+        title: Сегодня — 1-комнатные
+        description: "Подмножество today_all, отфильтрованное по комнат='1к'."
+        facets: [застройщик, город, отделка]
+        sort_desc: дата_среза
+      blocks:
+        description: Справочник ЖК — имя, slug, метро, координаты, город, адрес.
+        facets: [developer, city]
+      flats:
+        description: Стабильные характеристики квартир (этаж, площадь, корпус).
+      snapshots:
+        description: Ежедневный срез — цены, статус, отделка, лучшая ипотека.
+        sort_desc: scan_date
+    queries:
+      price_history:
+        title: История цены конкретной квартиры
+        sql: |-
+          SELECT scan_date, price, meter_price, status
+          FROM snapshots
+          WHERE flat_id = :flat_id
+          ORDER BY scan_date
