@@ -392,6 +392,67 @@ def build_rows(
     return block_payloads, flat_rows, snap_rows
 
 
+def to_int(value: object) -> int | None:
+    """int или None — без исключений на мусоре. Общий для всех источников."""
+    try:
+        return int(value)  # type: ignore[call-overload]
+    except (TypeError, ValueError):
+        return None
+
+
+def to_float(value: object) -> float | None:
+    """float или None; ''/'None' (литералы от кривых сериализаторов) → None."""
+    if value in (None, "", "None"):
+        return None
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def parse_coords(raw: object) -> tuple[float, float] | None:
+    """«55.83,37.92» → (lat, lng). Строковый литерал 'None' и не-строки → None."""
+    if not raw or not isinstance(raw, str) or raw == "None" or "," not in raw:
+        return None
+    try:
+        lat, lng = raw.split(",", 1)
+        return float(lat.strip()), float(lng.strip())
+    except (ValueError, AttributeError):
+        return None
+
+
+def settlement_label(quarter: object, year: object) -> str | None:
+    """(q, y) → «q кв. y»; только год → «y»; ничего → None."""
+    if year and quarter:
+        return f"{quarter} кв. {year}"
+    return str(year) if year else None
+
+
+# Один warning на (источник, значение) за процесс — не зашумлять лог сканом
+_UNKNOWN_STATUSES_SEEN: set[tuple[str, str]] = set()
+
+
+def norm_status(raw: object, free_values: frozenset | set,
+                *, source: str) -> str | None:
+    """Нормализация кода статуса источника.
+
+    None → None (а не мусорный литерал "None" в snapshots); известный
+    «в продаже»-код → "free"; незнакомое значение сохраняем как str(raw)
+    И логируем warning — иначе смена enum'а у API (4 → 5) тихо
+    переклассифицировала бы весь источник, а downstream-фильтры
+    status='free' молча обнулили бы его.
+    """
+    if raw is None:
+        return None
+    if raw in free_values:
+        return "free"
+    key = (source, str(raw))
+    if key not in _UNKNOWN_STATUSES_SEEN:
+        _UNKNOWN_STATUSES_SEEN.add(key)
+        log.warning("%s: незнакомый статус %r — сохранён как есть", source, raw)
+    return str(raw)
+
+
 def totals_deficit(total: object, seen: int, *, tolerance: float = 0.98) -> bool:
     """True, если API заявил суммарный счётчик, а собрано заметно меньше.
 

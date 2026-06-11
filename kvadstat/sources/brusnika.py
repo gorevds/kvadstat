@@ -26,6 +26,8 @@ from kvadstat.sources.base import (
     SourceError,
     make_session,
     request_json,
+    to_float,
+    to_int,
 )
 
 DEVELOPER = "Брусника"
@@ -65,15 +67,8 @@ _FINISH_TAGS = [
 log = logging.getLogger("kvadstat.sources.brusnika")
 
 
-def _to_int(v) -> int | None:
-    try: return int(v)
-    except (TypeError, ValueError): return None
-
-
-def _to_float(v) -> float | None:
-    if v in (None, "", "None"): return None
-    try: return float(v)
-    except (TypeError, ValueError): return None
+_to_int = to_int      # общие парсеры (kvadstat.sources.base)
+_to_float = to_float
 
 
 def _money(v) -> int | None:

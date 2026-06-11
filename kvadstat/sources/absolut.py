@@ -15,7 +15,9 @@ from kvadstat.sources.base import (
     NormFlat,
     SourceError,
     make_session,
+    parse_coords,
     request_json,
+    settlement_label,
     totals_deficit,
 )
 
@@ -58,14 +60,8 @@ def _round_price(value) -> int | None:
 def _project_meta(project: dict) -> dict:
     """Метро/координаты/адрес из node.project (Абсолют GraphQL)."""
     meta: dict = {}
-    coords = project.get("coords")
-    if coords and isinstance(coords, str) and "," in coords:
-        try:
-            lat, lng = coords.split(",", 1)
-            meta["latitude"] = float(lat.strip())
-            meta["longitude"] = float(lng.strip())
-        except (ValueError, AttributeError):
-            pass
+    if (pair := parse_coords(project.get("coords"))):
+        meta["latitude"], meta["longitude"] = pair
     if project.get("address"):
         meta["address"] = project["address"]
     primary = (project.get("projectmetroSet") or [None])[0]
@@ -83,11 +79,8 @@ def _project_meta(project: dict) -> dict:
 
 
 def _settlement(building: dict) -> str | None:
-    year = building.get("completionYear")
-    quarter = building.get("completionQuarter")
-    if year and quarter:
-        return f"{quarter} кв. {year}"
-    return str(year) if year else None
+    return settlement_label(building.get("completionQuarter"),
+                            building.get("completionYear"))
 
 
 def _to_norm(node: dict) -> NormFlat:

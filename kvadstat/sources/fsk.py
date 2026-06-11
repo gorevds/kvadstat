@@ -16,7 +16,9 @@ from kvadstat.sources.base import (
     NormFlat,
     SourceError,
     make_session,
+    norm_status,
     request_json,
+    to_int,
 )
 
 DEVELOPER = "ГК ФСК"
@@ -27,11 +29,7 @@ _MSK_CITY_ID = 1
 log = logging.getLogger("kvadstat.sources.fsk")
 
 
-def _to_int(value) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+_to_int = to_int  # общий парсер (kvadstat.sources.base)
 
 
 def _finish_label(fl: dict) -> str | None:
@@ -41,14 +39,8 @@ def _finish_label(fl: dict) -> str | None:
 
 
 def _status_label(raw) -> str | None:
-    """API отдаёт только продающиеся квартиры (status 0).
-
-    Прочее на всякий случай сохраняем как есть; отсутствующий статус — None,
-    а не строка «None» (иначе в snapshots осел бы мусорный литерал).
-    """
-    if raw == 0:
-        return "free"
-    return None if raw is None else str(raw)
+    """API отдаёт только продающиеся квартиры (status 0)."""
+    return norm_status(raw, {0}, source="ГК ФСК")
 
 
 def _to_norm(fl: dict, block_slug: str) -> NormFlat:

@@ -24,6 +24,7 @@ from kvadstat.sources.base import (
     make_session,
     request_json,
     request_text,
+    to_int,
 )
 
 DEVELOPER = "Донстрой"
@@ -83,11 +84,7 @@ def _to_float(value) -> float | None:
         return None
 
 
-def _to_int(value) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+_to_int = to_int  # общий парсер (kvadstat.sources.base)
 
 
 def _slug_from_link(link: str | None) -> str | None:

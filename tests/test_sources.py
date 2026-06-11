@@ -1290,3 +1290,28 @@ def test_absolut_paginates_by_immutable_key(monkeypatch):
     monkeypatch.setattr("kvadstat.sources.absolut.request_json", fake)
     absolut.collect()
     assert seen == ["pk"]
+
+
+# --- T14: общие хелперы base ---------------------------------------------
+
+def test_base_norm_status_contract():
+    from kvadstat.sources.base import norm_status
+    assert norm_status(None, {4}, source="t") is None      # не литерал "None"
+    assert norm_status(4, {4}, source="t") == "free"
+    assert norm_status(5, {4}, source="t") == "5"          # незнакомое — как есть
+
+
+def test_base_parse_coords_contract():
+    from kvadstat.sources.base import parse_coords
+    assert parse_coords("55.83, 37.92") == (55.83, 37.92)
+    assert parse_coords("None") is None
+    assert parse_coords(None) is None
+    assert parse_coords("bad") is None
+    assert parse_coords(55.83) is None
+
+
+def test_base_settlement_label_contract():
+    from kvadstat.sources.base import settlement_label
+    assert settlement_label("4", "2025") == "4 кв. 2025"
+    assert settlement_label(None, 2027) == "2027"
+    assert settlement_label(None, None) is None

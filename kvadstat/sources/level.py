@@ -16,8 +16,11 @@ from kvadstat.sources.base import (
     NormBlock,
     NormFlat,
     make_session,
+    norm_status,
+    parse_coords,
     request_json,
     safe_next_url,
+    settlement_label,
     totals_deficit,
 )
 
@@ -31,14 +34,7 @@ _MAX_PAGES = 120  # 100×120 = 12k квартир: запас ×2 над реа�
 log = logging.getLogger("kvadstat.sources.level")
 
 
-def _coords(raw: str | None) -> tuple[float, float] | None:
-    if not raw or "," not in raw:
-        return None
-    try:
-        lat, lng = raw.split(",", 1)
-        return float(lat.strip()), float(lng.strip())
-    except (ValueError, AttributeError):
-        return None
+_coords = parse_coords  # общий парсер (kvadstat.sources.base)
 
 
 def _fetch_project_meta(session: requests.Session) -> dict[str, dict]:
@@ -81,11 +77,7 @@ def _fetch_project_meta(session: requests.Session) -> dict[str, dict]:
 
 
 def _settlement(fl: dict) -> str | None:
-    year = fl.get("completion_year")
-    quarter = fl.get("completion_quarter")
-    if year and quarter:
-        return f"{quarter} кв. {year}"
-    return str(year) if year else None
+    return settlement_label(fl.get("completion_quarter"), fl.get("completion_year"))
 
 
 def _section_no(fl: dict) -> int | None:
@@ -118,7 +110,7 @@ def _to_norm(fl: dict) -> NormFlat:
         price=price,
         meter_price=fl.get("ppm"),
         old_price=old_price,
-        status="free" if fl.get("status") == 1 else str(fl.get("status")),
+        status=norm_status(fl.get("status"), {1}, source="Level"),
         bulk_name=(f"Корпус {building}" if building else None),
         section_no=_section_no(fl),
         settlement_date=_settlement(fl),

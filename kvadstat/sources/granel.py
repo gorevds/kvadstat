@@ -17,8 +17,12 @@ from kvadstat.sources.base import (
     NormBlock,
     NormFlat,
     make_session,
+    norm_status,
+    parse_coords,
     request_json,
     safe_next_url,
+    settlement_label,
+    to_int,
     totals_deficit,
 )
 
@@ -44,29 +48,15 @@ _FINISH_MAP = {
 }
 
 
-def _to_int(value) -> int | None:
-    try: return int(value)
-    except (TypeError, ValueError): return None
+_to_int = to_int  # общий парсер (kvadstat.sources.base)
 
 
-def _coords(raw: str | None) -> tuple[float, float] | None:
-    """«55.8337833,37.925461» → (lat, lng). API отдаёт строкой."""
-    if not raw or "," not in raw:
-        return None
-    try:
-        lat, lng = raw.split(",", 1)
-        return float(lat.strip()), float(lng.strip())
-    except (ValueError, AttributeError):
-        return None
+_coords = parse_coords  # общий парсер (kvadstat.sources.base)
 
 
 def _settlement(fl: dict) -> str | None:
     """«4 кв. 2025» из completion_quarter + completion_year (оба строки)."""
-    y = fl.get("completion_year")
-    q = fl.get("completion_quarter")
-    if y and q:
-        return f"{q} кв. {y}"
-    return str(y) if y else None
+    return settlement_label(fl.get("completion_quarter"), fl.get("completion_year"))
 
 
 def _to_norm(fl: dict) -> NormFlat:
@@ -97,7 +87,7 @@ def _to_norm(fl: dict) -> NormFlat:
         old_price=old_price,
         # status: 1 = в продаже, прочие — забронированы/проданы. API уже
         # фильтрует чем-то — берём «free» для всех результатов.
-        status="free" if fl.get("status") == 1 else str(fl.get("status")),
+        status=norm_status(fl.get("status"), {1}, source="Гранель"),
         bulk_name=(f"Корпус {building}" if building not in (None, "") else None),
         section_no=_to_int(fl.get("section")),
         settlement_date=_settlement(fl),

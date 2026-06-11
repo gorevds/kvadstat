@@ -20,7 +20,11 @@ from kvadstat.sources.base import (
     NormBlock,
     NormFlat,
     make_session,
+    norm_status,
+    parse_coords,
     request_json,
+    settlement_label,
+    to_int,
     totals_deficit,
 )
 
@@ -39,32 +43,22 @@ _MAX_PAGES = 20           # пагинируем на случай роста
 log = logging.getLogger("kvadstat.sources.ingrad")
 
 
-def _to_int(value) -> int | None:
-    try: return int(value)
-    except (TypeError, ValueError): return None
+_to_int = to_int  # общий парсер (kvadstat.sources.base)
 
 
-def _coords_pair(raw) -> tuple[float, float] | None:
-    """API даёт coords как строку 'lat,lng' либо как литерал 'None' — фильтруем."""
-    if not raw or raw == "None" or not isinstance(raw, str) or "," not in raw:
-        return None
-    try:
-        lat, lng = raw.split(",", 1)
-        return float(lat.strip()), float(lng.strip())
-    except (ValueError, AttributeError):
-        return None
+_coords_pair = parse_coords  # общий парсер ('None'-литерал тоже фильтрует)
 
 
 def _settlement_from_house(house: dict | None) -> str | None:
     if not house:
         return None
-    y = house.get("settlement_year")
-    q = house.get("settlement_quarter")
-    if y and q:
-        return f"{q} кв. {y}"
+    label = settlement_label(house.get("settlement_quarter"),
+                             house.get("settlement_year"))
+    if label and "кв." in label:
+        return label
     # fallback на «settling_text» — но он часто длинный «1 квартал 2024 г.»
     s = house.get("settling_text")
-    return s if s else (str(y) if y else None)
+    return s if s else label
 
 
 def _to_norm(fl: dict) -> NormFlat | None:
@@ -91,7 +85,7 @@ def _to_norm(fl: dict) -> NormFlat | None:
         price=price,
         meter_price=_to_int(fl.get("squareCost")),
         old_price=old_price,
-        status="free" if fl.get("status") == "free" else str(fl.get("status")),
+        status=norm_status(fl.get("status"), {"free"}, source="Инград"),
         bulk_name=(house.get("name") or None),
         section_no=_to_int(section.get("number") or fl.get("sectionNum")),
         settlement_date=_settlement_from_house(house),

@@ -15,8 +15,11 @@ from kvadstat.sources.base import (
     NormBlock,
     NormFlat,
     make_session,
+    norm_status,
+    parse_coords,
     request_json,
     safe_next_url,
+    to_int,
     totals_deficit,
 )
 
@@ -30,15 +33,7 @@ _MAX_PAGES = 50  # предохранитель: 50 * 1000 квартир с б�
 log = logging.getLogger("kvadstat.sources.a101")
 
 
-def _coords(raw: str | None) -> tuple[float, float] | None:
-    """Парсит «55.601127,37.220517» → (lat, lng). API возвращает строкой."""
-    if not raw or "," not in raw:
-        return None
-    try:
-        lat, lng = raw.split(",", 1)
-        return float(lat.strip()), float(lng.strip())
-    except (ValueError, AttributeError):
-        return None
+_coords = parse_coords  # общий парсер (kvadstat.sources.base)
 
 
 def _project_meta_from_detail(p: dict) -> dict:
@@ -63,11 +58,7 @@ def _project_meta_from_detail(p: dict) -> dict:
     return meta
 
 
-def _to_int(value) -> int | None:
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return None
+_to_int = to_int  # общий парсер (kvadstat.sources.base)
 
 
 def _to_norm(fl: dict) -> NormFlat:
@@ -85,7 +76,7 @@ def _to_norm(fl: dict) -> NormFlat:
         price=price,
         meter_price=fl.get("actual_ppm") or fl.get("ppm"),
         old_price=old_price,
-        status="free" if fl.get("status") == 4 else str(fl.get("status")),
+        status=norm_status(fl.get("status"), {4}, source="А101"),
         bulk_name=(f"Корпус {building}" if building else None),
         section_no=_to_int(fl.get("section_number")),
         settlement_date=fl.get("stage_key_transfer_date"),
