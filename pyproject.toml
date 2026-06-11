@@ -28,7 +28,10 @@ packages = ["kvadstat"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+# live-маркер исключён по умолчанию: реальные HTTP к API застройщиков.
+# Запуск: pytest -m live (см. tests/test_live_smoke.py)
+addopts = "-q -m 'not live'"
+markers = ["live: реальные запросы к API застройщиков (выключено по умолчанию)"]
 
 # Ruff: быстрый линтер + форматтер. Только то, что регулярно ловит реальные
 # баги, без воинствующего стиля — наш код в большинстве своём уже close to
