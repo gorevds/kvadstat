@@ -1,0 +1,29 @@
+[Unit]
+Description=kvadstat per-developer data freshness check
+After=network.target
+# Ловит «источник молча умер навсегда»: exit-код скана терпит флапы,
+# scan_runs-статусы сами по себе никого не будят. Ненулевой exit здесь
+# (источник без данных > N дней / последний скан error) → OnFailure →
+# Telegram/journal.
+OnFailure=kvadstat-notify@%n.service
+
+[Service]
+Type=oneshot
+User=kvadstat
+Group=kvadstat
+WorkingDirectory=/opt/kvadstat
+Environment=TZ=Europe/Moscow
+ExecStart=/opt/kvadstat/venv/bin/python -m bin.check_freshness --db /opt/kvadstat/data/kvadstat.db --max-age-days 2
+StandardOutput=journal
+StandardError=journal
+
+MemoryMax=128M
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+NoNewPrivileges=yes
+# чтение БД (sqlite требует w на каталоге для -wal/-shm даже читателю)
+ReadWritePaths=/opt/kvadstat/data
+TimeoutStartSec=120

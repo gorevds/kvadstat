@@ -1,6 +1,7 @@
 [Unit]
 Description=Daily backup of kvadstat.db (sqlite .backup + gzip + 14d rotation)
 After=network.target
+OnFailure=kvadstat-notify@%n.service
 
 [Service]
 Type=oneshot

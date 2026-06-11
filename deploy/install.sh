@@ -11,16 +11,6 @@ REPO_DIR="${REPO_DIR:-$PWD}"
 APP_DIR="/opt/kvadstat"
 SVC_USER="kvadstat"
 
-# OnSuccess=/OnFailure= в kvadstat-scan.service требуют systemd >= 249
-# (Ubuntu 22.04 LTS / Debian 12 / RHEL 9). На более старых системах
-# чейн kvadstat-scan-dev молча не сработает (никакой ошибки в daemon-reload).
-# Прерываемся ДО изменений: лучше явный fail, чем тихая регрессия.
-SYSTEMD_VER=$(systemctl --version | awk 'NR==1{print $2}')
-if [ "${SYSTEMD_VER:-0}" -lt 249 ]; then
-  echo "ERROR: systemd $SYSTEMD_VER < 249 — нужен Ubuntu 22.04+/Debian 12+ для OnSuccess= в kvadstat-scan.service" >&2
-  exit 1
-fi
-
 # 1. Системный пользователь
 id -u "$SVC_USER" &>/dev/null || useradd --system --home "$APP_DIR" --shell /usr/sbin/nologin "$SVC_USER"
 
@@ -49,12 +39,28 @@ for old in kvadstat-scan-dev.timer kvadstat-scan-dev.service; do
   fi
 done
 
-install -m 644 "$APP_DIR/deploy/kvadstat.service"          /etc/systemd/system/kvadstat.service
-install -m 644 "$APP_DIR/deploy/kvadstat-scan.service"     /etc/systemd/system/kvadstat-scan.service
-install -m 644 "$APP_DIR/deploy/kvadstat-scan.timer"       /etc/systemd/system/kvadstat-scan.timer
-install -m 644 "$APP_DIR/deploy/kvadstat-backup.service"   /etc/systemd/system/kvadstat-backup.service
-install -m 644 "$APP_DIR/deploy/kvadstat-backup.timer"     /etc/systemd/system/kvadstat-backup.timer
+install -m 644 "$APP_DIR/deploy/kvadstat.service"            /etc/systemd/system/kvadstat.service
+install -m 644 "$APP_DIR/deploy/kvadstat-scan.service"       /etc/systemd/system/kvadstat-scan.service
+install -m 644 "$APP_DIR/deploy/kvadstat-scan.timer"         /etc/systemd/system/kvadstat-scan.timer
+install -m 644 "$APP_DIR/deploy/kvadstat-backup.service"     /etc/systemd/system/kvadstat-backup.service
+install -m 644 "$APP_DIR/deploy/kvadstat-backup.timer"       /etc/systemd/system/kvadstat-backup.timer
+install -m 644 "$APP_DIR/deploy/kvadstat-notify@.service"    /etc/systemd/system/kvadstat-notify@.service
+install -m 644 "$APP_DIR/deploy/kvadstat-freshness.service"  /etc/systemd/system/kvadstat-freshness.service
+install -m 644 "$APP_DIR/deploy/kvadstat-freshness.timer"    /etc/systemd/system/kvadstat-freshness.timer
 systemctl daemon-reload
+
+# Telegram-алертинг: токены живут вне репозитория. Шаблон кладём только
+# если файла нет (не клоббрим настроенный).
+install -d -m 750 /etc/kvadstat
+if [ ! -f /etc/kvadstat/notify.env ]; then
+  cat > /etc/kvadstat/notify.env <<'ENVEOF'
+# Заполните для Telegram-алертов (OnFailure у scan/backup/freshness):
+# TG_BOT_TOKEN=123456:ABC...
+# TG_CHAT_ID=123456789
+ENVEOF
+  chmod 600 /etc/kvadstat/notify.env
+  echo ">>> создан шаблон /etc/kvadstat/notify.env — заполните TG_* для алертов"
+fi
 
 # 5. Первый прогон скана. kvadstat-scan.service теперь обходит все 10 застройщиков
 # одной командой (см. ExecStart=bin.scan_dev --all). kvadstat-scan-dev.service
@@ -69,6 +75,7 @@ systemctl restart kvadstat.service 2>/dev/null || true
 systemctl enable --now kvadstat.service
 systemctl enable --now kvadstat-scan.timer
 systemctl enable --now kvadstat-backup.timer
+systemctl enable --now kvadstat-freshness.timer
 systemctl status kvadstat.service --no-pager | head -10
 
 # 7. Nginx — двухшаговая раскатка для первичного выпуска TLS-сертификата

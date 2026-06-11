@@ -1,6 +1,8 @@
 [Unit]
 Description=Run kvadstat-scan daily at 06:00 MSK
-Requires=kvadstat-scan.service
+# NB: НЕ добавлять Requires=kvadstat-scan.service — Requires в [Unit]
+# таймера тянет сервис при старте самого таймера (= каждый ребут /
+# enable --now), а не только по расписанию: внеплановые дневные сканы.
 
 [Timer]
 OnCalendar=*-*-* 06:00:00 Europe/Moscow

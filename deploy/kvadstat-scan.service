@@ -1,6 +1,7 @@
 [Unit]
 Description=Daily price scan — all 10 developers (PIK + 9 others) → SQLite
 After=network.target
+OnFailure=kvadstat-notify@%n.service
 # До R5 рефактора (2026-05-25) было два юнита: kvadstat-scan (только ПИК) и
 # kvadstat-scan-dev (только не-ПИК), скованных OnSuccess-цепью. После R1+R5
 # scan_dev обрабатывает все 10 застройщиков одной командой — двух юнитов

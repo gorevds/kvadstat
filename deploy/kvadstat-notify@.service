@@ -1,0 +1,13 @@
+[Unit]
+Description=kvadstat failure notification for %i
+
+# Шаблонный юнит: подключается как OnFailure=kvadstat-notify@%n.service.
+# Работает под root: нужен доступ к journalctl чужого юнита и к
+# /etc/kvadstat/notify.env (0600 root).
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /opt/kvadstat/deploy/notify.sh %i
+# Уведомление — best effort: не дольше минуты, без ретраев самого юнита
+# (Telegram-ретрай не нужен — алерт продублирован в journal).
+TimeoutStartSec=60

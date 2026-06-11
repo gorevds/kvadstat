@@ -1,0 +1,12 @@
+[Unit]
+Description=Run kvadstat-freshness daily at 09:30 MSK (после сканов в 06:00)
+
+[Timer]
+# 09:30 МСК: скан в 06:00 (+RandomizedDelay+длительность) гарантированно
+# завершён; будний человек уже у телефона, алерт не потеряется в ночи.
+OnCalendar=*-*-* 09:30:00 Europe/Moscow
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target
