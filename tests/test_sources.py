@@ -1277,3 +1277,16 @@ def test_donstroy_max_pages_counts_skipped(monkeypatch):
                         lambda *a, **k: {})
     r = donstroy.collect()
     assert r.skipped >= 1
+
+
+def test_absolut_paginates_by_immutable_key(monkeypatch):
+    """Сортировка обхода — по иммутабельному pk, не по мутабельной цене."""
+    seen = []
+
+    def fake(session, method, url, *, json=None, **kw):
+        seen.append(json["variables"]["orderBy"])
+        return {"data": {"allFlats": {
+            "edges": [], "pageInfo": {"hasNextPage": False}}}}
+    monkeypatch.setattr("kvadstat.sources.absolut.request_json", fake)
+    absolut.collect()
+    assert seen == ["pk"]

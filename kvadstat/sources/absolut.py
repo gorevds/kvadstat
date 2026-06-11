@@ -142,8 +142,13 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
             json={
                 "operationName": "allFlats",
                 "query": _ALL_FLATS_QUERY,
+                # orderBy=pk (иммутабельный UUID): сортировать по цене
+                # нельзя — relay-курсор graphene это закодированный offset,
+                # и квартиры, переоценённые во время обхода, «переезжали» бы
+                # через границу страницы (потери/дубли). Та же логика, что
+                # у А101. Проверено live 2026-06-11: API принимает orderBy=pk.
                 "variables": {"first": _PAGE_SIZE, "after": after,
-                              "orderBy": "price"},
+                              "orderBy": "pk"},
             },
         )
         if payload.get("errors"):
