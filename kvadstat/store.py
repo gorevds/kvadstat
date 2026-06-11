@@ -445,6 +445,11 @@ def refresh_materialized(conn: sqlite3.Connection) -> None:
     # commit/rollback, atomic swap для Datasette-читателя). Логика сложнее SQL
     # (детект полного скана, защита от мерцания) → отдельный модуль velocity.py.
     build_velocity_tables(conn)
+    # Ночная полная пересборка раздувает -wal; под постоянным Datasette-
+    # читателем авто-checkpoint его не схлопывает. TRUNCATE — best effort:
+    # при активном читателе вернёт busy-строку (не исключение), wal дожмёт
+    # следующий checkpoint.
+    conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
 
 
 def apply_schema(conn: sqlite3.Connection) -> None:

@@ -310,36 +310,45 @@ def build_block_inventory_daily(conn: sqlite3.Connection) -> None:
     любой глубине истории. Падающая кривая = ЖК распродаётся.
     """
     reserved_set = ",".join(f"'{s}'" for s in RESERVED_STATUSES)
-    conn.execute("DROP TABLE IF EXISTS block_inventory_daily")
-    conn.execute(
-        f"""
-        CREATE TABLE block_inventory_daily AS
-        SELECT f.block_id AS block_id,
-               s.scan_date AS scan_date,
-               COUNT(DISTINCT s.flat_id) AS listed,
-               SUM(CASE WHEN s.status IN ({reserved_set}) THEN 1 ELSE 0 END) AS reserved
-        FROM snapshots s
-        JOIN flats f ON f.id = s.flat_id
-        GROUP BY f.block_id, s.scan_date
-        """
-    )
-    # Оставляем только «плотные» даты: глобальный дневной объём ≥ 50% от пика.
-    # Отсекает ранний разреженный/ПИК-only период, где счёт по ЖК скачет не
-    # из-за продаж, а из-за роста покрытия скрапа → кривая остатка чистая.
+    # Сначала выбираем даты, потом строим таблицу СРАЗУ отфильтрованной:
+    # прежний порядок (полная таблица за всю историю → построчный DELETE
+    # 99% строк) делал два лишних прохода по растущему snapshots.
+    #
+    # «Плотные» даты: глобальный дневной объём ≥ 50% от пика — отсекает
+    # ранний разреженный/ПИК-only период, где счёт по ЖК скачет не из-за
+    # продаж, а из-за роста покрытия скрапа → кривая остатка чистая.
+    # Окно INVENTORY_MAX_DATES: кривая нужна свежая, а таблица иначе растёт
+    # бесконечно (snapshots не прунятся) и однажды пробьёт лимит Datasette
+    # _size → тихий обрыв кривой без сигнала.
     counts = conn.execute(
         "SELECT scan_date, COUNT(*) FROM snapshots GROUP BY scan_date"
     ).fetchall()
     mx = max((c for _, c in counts), default=0)
     dense = sorted(d for d, c in counts if mx and c >= DENSE_DAY_FRACTION * mx)
-    # Ограничиваем кривую недавним окном: кривая нужна свежая, а таблица иначе
-    # растёт бесконечно (snapshots не прунятся) и однажды пробьёт лимит
-    # Datasette _size → тихий обрыв кривой без сигнала.
-    keep = set(dense[-INVENTORY_MAX_DATES:])
-    rows = conn.execute(
-        "SELECT rowid, scan_date FROM block_inventory_daily"
-    ).fetchall()
-    bad = [(rid,) for rid, d in rows if d not in keep]
-    conn.executemany("DELETE FROM block_inventory_daily WHERE rowid=?", bad)
+    keep = dense[-INVENTORY_MAX_DATES:]
+    conn.execute("DROP TABLE IF EXISTS block_inventory_daily")
+    if keep:
+        ph = ",".join("?" for _ in keep)
+        conn.execute(
+            f"""
+            CREATE TABLE block_inventory_daily AS
+            SELECT f.block_id AS block_id,
+                   s.scan_date AS scan_date,
+                   COUNT(DISTINCT s.flat_id) AS listed,
+                   SUM(CASE WHEN s.status IN ({reserved_set}) THEN 1 ELSE 0 END) AS reserved
+            FROM snapshots s
+            JOIN flats f ON f.id = s.flat_id
+            WHERE s.scan_date IN ({ph})
+            GROUP BY f.block_id, s.scan_date
+            """,
+            keep,
+        )
+    else:
+        # пустая БД: таблица с теми же колонками, чтобы Datasette/SPA не 404
+        conn.execute(
+            "CREATE TABLE block_inventory_daily ("
+            "block_id INTEGER, scan_date TEXT, listed INTEGER, reserved INTEGER)"
+        )
     conn.execute(
         "CREATE INDEX idx_inv_block ON block_inventory_daily(block_id, scan_date)"
     )
