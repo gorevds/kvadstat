@@ -154,15 +154,21 @@ def collect(
 
     blocks: list[NormBlock] = []
     flats: list[NormFlat] = []
+    skipped = 0
     for slug, name in MR_BLOCKS.items():
         try:
             html = _fetch_page(s, slug)
         except (SourceError, requests.RequestException) as exc:
             log.warning("MR Group: %s — пропущен: %s", slug, exc)
+            skipped += 1
             continue
         page_flats = parse_flats_page(html, slug)
         if not page_flats:
+            # анти-бот-заглушку от честного «всё распродано» по HTML не
+            # отличить — консервативно считаем деградацией (→ partial),
+            # чтобы velocity не приняла срезанный ЖК за массовую продажу
             log.warning("MR Group: %s — 0 квартир (анти-бот или нет в продаже)", slug)
+            skipped += 1
             continue
         # «X/Y этаж» — Y это этажность; берём максимум по карточкам
         # ЖК (≈ макс. этаж самого высокого корпуса).
@@ -179,5 +185,12 @@ def collect(
         log.info("MR Group: %s — %d квартир", slug, len(page_flats))
         time.sleep(sleep_sec)
 
-    log.info("MR Group: %d ЖК, %d квартир", len(blocks), len(flats))
-    return CollectResult(blocks=blocks, flats=flats)
+    if skipped and not blocks:
+        # Все slug'и недоступны/пусты — тотальный анти-бот или смена вёрстки,
+        # это ошибка источника (R1), а не частичная деградация.
+        raise SourceError(f"MR Group: все {skipped} ЖК недоступны или пусты")
+    # NB: распроданный ЖК даёт постоянный partial, пока его не убрали из
+    # MR_BLOCKS — реестр статический, прунить вручную при распродаже.
+    log.info("MR Group: %d ЖК, %d квартир (%d пропущено)",
+             len(blocks), len(flats), skipped)
+    return CollectResult(blocks=blocks, flats=flats, skipped=skipped)

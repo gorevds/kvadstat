@@ -89,3 +89,58 @@ def test_sources_registry_within_developer_registry():
     from kvadstat.developers import DEVELOPERS
 
     assert set(scan_dev.SOURCES) <= set(DEVELOPERS)
+
+
+def _scan_runs_row(db):
+    conn = sqlite3.connect(db)
+    try:
+        return conn.execute(
+            "SELECT status, error_msg, n_flats, n_rejected FROM scan_runs"
+        ).fetchone()
+    finally:
+        conn.close()
+
+
+def test_run_developer_zero_flats_is_partial(tmp_path, monkeypatch):
+    """Источник вернул 0 квартир без исключения (дрейф API) — это НЕ 'ok'."""
+    db = tmp_path / "empty.db"
+    monkeypatch.setattr(scan_dev, "SOURCES", {"ГК ФСК": lambda: CollectResult()})
+    scan_dev._ensure_schema(db)
+    scan_dev.run_developer(db, "ГК ФСК", scan_date="2026-06-11", scan_ts="t")
+    status, msg, n_flats, _ = _scan_runs_row(db)
+    assert status == "partial"
+    assert n_flats == 0
+    assert "0 квартир" in msg
+
+
+def test_run_developer_mass_rejection_is_partial(tmp_path, monkeypatch):
+    """Гейт отбраковал большинство квартир (смена единиц/формата) — 'partial'.
+
+    9 из 10 квартир в гео-невалидном ЖК (нулевые координаты ≈ 7000 км от
+    Москвы) → n_rejected=9 > 20% → день нельзя считать полным.
+    """
+    bad_block = NormBlock(native_id="bad", name="Плохой", slug="bad",
+                          meta={"latitude": 0.0, "longitude": 0.0})
+    good_block = NormBlock(native_id="good", name="Хороший", slug="good")
+    flats = [NormFlat(native_id=f"b{i}", native_block_id="bad", rooms=1,
+                      area=40.0, floor=2, price=10_000_000) for i in range(9)]
+    flats.append(NormFlat(native_id="g1", native_block_id="good", rooms=1,
+                          area=40.0, floor=2, price=10_000_000))
+    res = CollectResult(blocks=[bad_block, good_block], flats=flats)
+    db = tmp_path / "rej.db"
+    monkeypatch.setattr(scan_dev, "SOURCES", {"ГК ФСК": lambda: res})
+    scan_dev._ensure_schema(db)
+    scan_dev.run_developer(db, "ГК ФСК", scan_date="2026-06-11", scan_ts="t")
+    status, msg, n_flats, n_rejected = _scan_runs_row(db)
+    assert (n_flats, n_rejected) == (1, 9)
+    assert status == "partial"
+    assert "отбраковано" in msg
+
+
+def test_main_fails_at_exactly_twenty_pct(tmp_path, monkeypatch):
+    # Ровно 2 из 10 (порог 20%) — уже red. NB: main() сам инжектит 'ПИК'
+    # в SOURCES, поэтому даём 9 ключей: 9 + ПИК = ровно 10 застройщиков.
+    monkeypatch.setattr(scan_dev, "run_sweep", lambda *a, **k: 2)
+    monkeypatch.setattr(scan_dev, "SOURCES", dict.fromkeys("abcdefghi"))
+    rc = scan_dev.main(["--db", str(tmp_path / "x.db"), "--all"])
+    assert rc == 1

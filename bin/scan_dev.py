@@ -25,7 +25,7 @@ from pathlib import Path
 
 from kvadstat.blocks_meta import upsert_block_meta
 from kvadstat.developers import DEVELOPERS, ID_NAMESPACE
-from kvadstat.quality import DataQualityStats
+from kvadstat.quality import REJECT_PARTIAL_FRACTION, DataQualityStats
 from kvadstat.sources import (
     a101,
     absolut,
@@ -201,6 +201,19 @@ def run_developer(
             status, msg = "error", err_msg
         elif skipped:
             status, msg = "partial", f"{skipped} единиц(ы) пропущено при сборе"
+        elif n_rejected > REJECT_PARTIAL_FRACTION * (n_flats + n_rejected):
+            # Проверяется ДО ветки n_flats==0: при тотальной отбраковке
+            # (все цены в копейках и т.п.) оператор должен увидеть «gate
+            # отбраковал», а не ложное «источник вернул 0 квартир».
+            status, msg = "partial", (
+                f"{n_rejected} из {n_flats + n_rejected} квартир отбраковано "
+                "data-quality gate (смена формата/единиц у API?)"
+            )
+        elif n_flats == 0:
+            # Сбор «успешен», но квартир ноль — у реального застройщика так
+            # не бывает; это дрейф API (переименованный ключ, новый формат),
+            # и день нельзя считать полным.
+            status, msg = "partial", "источник вернул 0 квартир (дрейф API?)"
         else:
             status, msg = "ok", None
         # R4: try/finally close — даже если record_scan_run упадёт (busy/disk),
@@ -321,14 +334,12 @@ def main(argv: list[str] | None = None) -> int:
     # = вчерашний снимок остаётся, аналитика не страдает. Но 20%+
     # сбоев = действительно что-то не так с сетью/прокси, ловим.
     #
-    # R3: для одиночного --developer допуск НЕ применяется. Иначе
-    # threshold = 1//5 = 0, а `failed(max 1) > 1` всегда False — ручной
-    # перезапуск `--developer X` возвращал бы 0 даже при сбое, скрывая его
-    # от обёртки/оператора, читающего $?.
-    if len(developers) == 1:
-        return 1 if failed else 0
-    threshold = max(1, len(developers) // 5)
-    return 1 if failed > threshold else 0
+    # R3: порог — ceil(n/5), red при failed >= threshold: ровно «20%+ сбоев»
+    # для любого n (10 → 2; 9 → 2, т.е. один флап из 9 всё ещё терпим;
+    # 1 → 1, одиночный --developer падает при любом сбое). Прежний
+    # max(1, n//5) с «>» давал red только с 30% при n=10.
+    threshold = -(-len(developers) // 5)
+    return 1 if failed >= threshold else 0
 
 
 if __name__ == "__main__":

@@ -100,12 +100,18 @@ def collect(
 
     blocks: list[NormBlock] = []
     flats: list[NormFlat] = []
+    skipped = 0
     for c in region:
-        slug = c.get("slug")
-        if not slug:
-            continue
         # ЖК без квартир в продаже (сдан/распродан) — пропускаем запрос
         if not (c.get("flats") or {}).get("all"):
+            continue
+        slug = c.get("slug")
+        if not slug:
+            # продажи заявлены, а slug пропал — дрейф схемы каталога,
+            # такой ЖК молча выпал бы из обхода со статусом 'ok'
+            log.warning("ФСК: ЖК без slug при заявленных продажах: %r",
+                        c.get("title"))
+            skipped += 1
             continue
         try:
             raw = request_json(
@@ -113,11 +119,18 @@ def collect(
                 params={"complex_slug": slug, "limit": 5000},
             )
         except SourceError as exc:
-            # один сбойный ЖК не должен ронять весь обход застройщика
+            # один сбойный ЖК не должен ронять весь обход застройщика,
+            # но обязан попасть в skipped → status='partial' в scan_runs
             log.warning("ФСК: %s — пропущен из-за ошибки: %s", slug, exc)
+            skipped += 1
             continue
         items = raw if isinstance(raw, list) else (raw.get("data") or [])
         if not items:
+            # каталог заявил квартиры в продаже, а выдача пуста — дрейф
+            # формата ответа, считаем деградацией, а не «распродано»
+            log.warning("ФСК: %s — заявлено %s квартир, получено 0",
+                        slug, (c.get("flats") or {}).get("all"))
+            skipped += 1
             continue
         # FSK API не отдаёт floors_max явно — оцениваем как MAX(floorNumber)
         # по квартирам ЖК (нижняя граница реальной этажности здания).
@@ -137,5 +150,10 @@ def collect(
         flats.extend(_to_norm(fl, slug) for fl in items)
         log.info("ФСК: %s — %d квартир", slug, len(items))
 
-    log.info("ФСК: всего %d ЖК, %d квартир", len(blocks), len(flats))
-    return CollectResult(blocks=blocks, flats=flats)
+    if skipped and not blocks:
+        # Тотальный отказ (каждый ЖК с продажами недоступен) — это ошибка
+        # источника, а не «частичная деградация»: зеркало R1-контракта PIK.
+        raise SourceError(f"ФСК: все {skipped} ЖК с продажами недоступны")
+    log.info("ФСК: всего %d ЖК, %d квартир (%d пропущено)",
+             len(blocks), len(flats), skipped)
+    return CollectResult(blocks=blocks, flats=flats, skipped=skipped)

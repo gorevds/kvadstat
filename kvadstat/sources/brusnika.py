@@ -23,6 +23,7 @@ from kvadstat.sources.base import (
     CollectResult,
     NormBlock,
     NormFlat,
+    SourceError,
     make_session,
     request_json,
 )
@@ -219,17 +220,25 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     s = session or make_session()
     all_blocks: list[NormBlock] = []
     all_flats: list[NormFlat] = []
+    skipped = 0
     for region, city in _REGIONS.items():
         try:
             r = _collect_region(s, region, city)
         except Exception as exc:  # noqa: BLE001 — per-region изоляция
             # Любой сбой (SourceError, RequestException, неожиданный
             # формат payload → AttributeError/KeyError) — пропускаем
-            # регион, остальные продолжают.
+            # регион, остальные продолжают; пропуск виден в skipped
+            # (→ status='partial'), а не растворяется в логах.
             log.warning("Брусника [%s] — регион пропущен: %s", region, exc)
+            skipped += 1
             continue
         all_blocks.extend(r.blocks)
         all_flats.extend(r.flats)
-    log.info("Брусника: всего %d ЖК, %d квартир по %d регионам",
-             len(all_blocks), len(all_flats), len(_REGIONS))
-    return CollectResult(blocks=all_blocks, flats=all_flats)
+        skipped += r.skipped
+    if skipped and not all_blocks:
+        # Все регионы упали — тотальный отказ источника (смена хоста/схемы),
+        # ошибка (R1), а не частичная деградация.
+        raise SourceError(f"Брусника: все {len(_REGIONS)} регионов недоступны")
+    log.info("Брусника: всего %d ЖК, %d квартир по %d регионам (%d пропущено)",
+             len(all_blocks), len(all_flats), len(_REGIONS), skipped)
+    return CollectResult(blocks=all_blocks, flats=all_flats, skipped=skipped)

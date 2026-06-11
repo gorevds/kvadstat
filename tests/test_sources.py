@@ -1080,3 +1080,111 @@ def test_pik_norm_block_floors_max_never_below_flat_floor():
     nb = pik_src._norm_block(items, block_id=222)
     assert nb is not None
     assert nb.meta["floors_max"] == 30
+
+
+def test_brusnika_region_failure_counts_skipped(monkeypatch):
+    """Пропущенный регион обязан попасть в CollectResult.skipped (→ partial)."""
+    from kvadstat.sources.base import SourceError as _SE
+
+    def fake(session, region, city):
+        if region == "moskva":
+            raise _SE("boom")
+        return CollectResult(blocks=[NormBlock(native_id="x", name="X", slug="x")],
+                             flats=[])
+    monkeypatch.setattr("kvadstat.sources.brusnika._collect_region", fake)
+    r = brusnika.collect()
+    assert r.skipped == 1
+
+
+def test_mrgroup_failures_and_antibot_count_skipped(monkeypatch):
+    """Сбой загрузки slug'а и анти-бот-пустышка — обе деградации видимы."""
+    from kvadstat.sources.base import SourceError as _SE
+
+    def fake_fetch(session, slug):
+        if slug == "citybay":
+            raise _SE("403")        # упавший slug
+        if slug == "mira":
+            return "<html></html>"  # анти-бот-пустышка: 0 карточек
+        return slug                 # «нормальная» страница (см. fake_parse)
+
+    def fake_parse(html, slug):
+        if html in ("<html></html>",):
+            return []
+        return [NormFlat(native_id=f"{slug}-1", native_block_id=slug,
+                         rooms=1, area=40.0, floor=2, price=10_000_000)]
+    monkeypatch.setattr("kvadstat.sources.mrgroup._fetch_page", fake_fetch)
+    monkeypatch.setattr("kvadstat.sources.mrgroup.parse_flats_page", fake_parse)
+    r = mrgroup.collect(sleep_sec=0)
+    assert r.skipped == 2           # 403 + пустышка
+    assert len(r.blocks) == len(mrgroup.MR_BLOCKS) - 2
+
+
+def test_mrgroup_total_failure_raises(monkeypatch):
+    """Все slug'и недоступны — это SourceError (R1), а не тихий partial."""
+    from kvadstat.sources.base import SourceError as _SE
+
+    def fake_fetch(session, slug):
+        raise _SE("403")
+    monkeypatch.setattr("kvadstat.sources.mrgroup._fetch_page", fake_fetch)
+    import pytest as _pytest
+    with _pytest.raises(_SE):
+        mrgroup.collect(sleep_sec=0)
+
+
+def test_fsk_failed_complex_counts_skipped(monkeypatch):
+    """ЖК с заявленными квартирами, но упавшим/пустым ответом — в skipped."""
+    from kvadstat.sources.base import SourceError as _SE
+    complexes = [
+        {"city_id": fsk._MSK_CITY_ID, "slug": "boom", "title": "Бум",
+         "flats": {"all": 5}},
+        {"city_id": fsk._MSK_CITY_ID, "slug": "hollow", "title": "Пусто",
+         "flats": {"all": 7}},
+        # распроданный ЖК — легитимный пропуск, НЕ skipped
+        {"city_id": fsk._MSK_CITY_ID, "slug": "soldout", "title": "Всё",
+         "flats": {"all": 0}},
+    ]
+
+    complexes.append({"city_id": fsk._MSK_CITY_ID, "slug": "good",
+                      "title": "Хороший", "flats": {"all": 1}})
+
+    def fake(session, method, url, **kw):
+        if url == fsk._COMPLEX_URL:
+            return complexes
+        slug = kw.get("params", {}).get("complex_slug")
+        if slug == "boom":
+            raise _SE("503")
+        if slug == "good":
+            return [{"externalId": "g1", "floorNumber": 3}]
+        return []  # hollow: заявлено 7 квартир, пришло 0
+    monkeypatch.setattr("kvadstat.sources.fsk.request_json", fake)
+    r = fsk.collect()
+    assert r.skipped == 2
+    assert len(r.blocks) == 1
+
+
+def test_fsk_total_failure_raises(monkeypatch):
+    """Каждый ЖК с продажами недоступен — SourceError (R1)."""
+    from kvadstat.sources.base import SourceError as _SE
+    complexes = [{"city_id": fsk._MSK_CITY_ID, "slug": "a", "title": "А",
+                  "flats": {"all": 5}}]
+
+    def fake(session, method, url, **kw):
+        if url == fsk._COMPLEX_URL:
+            return complexes
+        raise _SE("503")
+    monkeypatch.setattr("kvadstat.sources.fsk.request_json", fake)
+    import pytest as _pytest
+    with _pytest.raises(_SE):
+        fsk.collect()
+
+
+def test_brusnika_total_failure_raises(monkeypatch):
+    """Все регионы упали — SourceError (R1), а не partial с нулём данных."""
+    from kvadstat.sources.base import SourceError as _SE
+
+    def fake(session, region, city):
+        raise _SE("host moved")
+    monkeypatch.setattr("kvadstat.sources.brusnika._collect_region", fake)
+    import pytest as _pytest
+    with _pytest.raises(_SE):
+        brusnika.collect()
