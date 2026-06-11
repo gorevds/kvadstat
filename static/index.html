@@ -664,9 +664,12 @@
 
 <main>
   <nav class="tabs" role="tablist" aria-label="Разделы">
-    <button type="button" data-tab="home" class="active" role="tab">🏠 Главная</button>
-    <button type="button" data-tab="zhk" role="tab">🏙 ЖК</button>
-    <button type="button" data-tab="objects" role="tab">📋 Все объекты</button>
+    <button type="button" data-tab="home" class="active" role="tab"
+            aria-selected="true" aria-controls="tab-home">🏠 Главная</button>
+    <button type="button" data-tab="zhk" role="tab"
+            aria-selected="false" aria-controls="tab-zhk">🏙 ЖК</button>
+    <button type="button" data-tab="objects" role="tab"
+            aria-selected="false" aria-controls="tab-objects">📋 Все объекты</button>
   </nav>
 
   <section id="tab-home" class="tab-panel active">
@@ -1148,7 +1151,9 @@ function roomMatches(roomVal) {
 function syncRoomButtons() {
   document.querySelectorAll(".controls button[data-rooms]").forEach(b => {
     const k = b.dataset.rooms;
-    b.classList.toggle("active", k === "all" ? selectedRooms.size === 0 : selectedRooms.has(k));
+    const on = k === "all" ? selectedRooms.size === 0 : selectedRooms.has(k);
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
   });
 }
 // Множественный выбор класса ЖК. Пустой набор = «все».
@@ -1159,7 +1164,9 @@ function classMatches(klassVal) {
 }
 function syncClassButtons() {
   document.querySelectorAll(".controls button[data-klass]").forEach(b => {
-    b.classList.toggle("active", selectedClasses.has(b.dataset.klass));
+    const on = selectedClasses.has(b.dataset.klass);
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-pressed", on ? "true" : "false");
   });
 }
 let currentCity = "all";
@@ -2086,7 +2093,7 @@ function renderCardList(rows) {
       : "—";
     const rent = rentMonthly(r);
     return (
-      `<div class="card${hasDisc ? " promo-card" : ""}" data-row-id="${Number(r.id)||0}">` +
+      `<div class="card${hasDisc ? " promo-card" : ""}" data-row-id="${Number(r.id)||0}" tabindex="0" role="button">` +
         `<div class="card-head">` +
           `<span class="dev-tag" style="background:${color}">${E(r["застройщик"])}</span>` +
           `<span class="zhk">${E(r["жк"])}</span>` +
@@ -2314,10 +2321,15 @@ async function load() {
   });
   // Click по любой строке таблицы → открыть боковую панель деталей.
   // Игнорируем клики по ссылкам/кнопкам внутри ячеек (План, Сайт, История).
-  // Запускаем async-загрузку sparkline-данных в фоне — таблица сразу
-  // рендерится без графиков, через 1-2 сек ячейки колонки «30 дн»
-  // оживут (table.redraw(true) в конце loadSparklines).
-  loadSparklines();
+  // Sparkline-данные (по массиву цен на КАЖДУЮ квартиру) — самый тяжёлый
+  // вторичный запрос; уводим в idle, чтобы не конкурировал за сеть/CPU с
+  // первым рендером таблицы. Ячейки «30 дн» оживут по приходе
+  // (table.redraw(true) в конце loadSparklines).
+  if ("requestIdleCallback" in window) {
+    requestIdleCallback(() => loadSparklines(), { timeout: 4000 });
+  } else {
+    setTimeout(() => loadSparklines(), 2500);
+  }
 
   table.on("rowClick", (e, row) => {
     if (e.target && e.target.closest("a, button")) return;
@@ -2326,15 +2338,23 @@ async function load() {
     openDetail(row.getData(), e.target && e.target.closest("tr") || e.target);
   });
   // Click на мобильной карточке: открыть detail-панель (тот же UX как desktop).
+  const openCardDetail = (card) => {
+    const id = Number(card.dataset.rowId);
+    if (!id) return;
+    const row = allRows.find(r => r.id === id);
+    if (row) openDetail(row, card);
+  };
   document.getElementById("cardList").addEventListener("click", (e) => {
     const card = e.target.closest && e.target.closest(".card");
     if (!card) return;
     if (e.target.closest("a, button")) return;
     if (window.getSelection && window.getSelection().toString().length) return;
-    const id = Number(card.dataset.rowId);
-    if (!id) return;
-    const row = allRows.find(r => r.id === id);
-    if (row) openDetail(row, card);
+    openCardDetail(card);
+  });
+  document.getElementById("cardList").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = e.target.closest && e.target.closest(".card");
+    if (card) { e.preventDefault(); openCardDetail(card); }
   });
 
   table.on("tableBuilt", () => {
@@ -2603,11 +2623,20 @@ async function load() {
   applyFilter();
 
   // ── Velocity / вкладка ЖК / роутинг по вкладкам ──────────────
-  [blockVel, invByBlock] = await Promise.all([loadBlockVelocity(), loadInventory()]);
-  zhkList = buildZhkList();
+  // Вкладки и контролы оживают СРАЗУ; velocity/inventory (до ~80k строк)
+  // догружаются параллельно и перерисовывают активную вкладку по приходу —
+  // раньше клики по вкладкам были мертвы, пока не докачается inventory.
   setupZhkControls();
   setupTabs();
   applyHash();
+  Promise.all([loadBlockVelocity(), loadInventory()]).then(([bv, inv]) => {
+    blockVel = bv;
+    invByBlock = inv;
+    zhkList = buildZhkList();
+    const active = document.querySelector(".tab-panel.active");
+    if (active && active.id === "tab-zhk") renderZhkList();
+    if (active && active.id === "tab-home") renderHomeStats();
+  });
 }
 
 // ════════════ Вкладки, Главная, ЖК (velocity) ════════════════════
@@ -2615,15 +2644,34 @@ let blockVel = {};       // block_id → строка block_velocity
 let invByBlock = {};     // block_id → [{scan_date, listed, reserved}]
 let zhkList = [];        // объединённый список ЖК (velocity + цены)
 
+// Не-фатальная деградация данных: жёлтый баннер вместо тихих нулей —
+// «0 ЖК ушло» при упавшем velocity неотличимо от реальных данных.
+function warnDataIssue(text) {
+  const el = document.getElementById("trunc-banner");
+  if (!el) return;
+  el.textContent = (el.style.display === "block" && el.textContent
+                    ? el.textContent + " · " : "⚠ ") + text;
+  el.style.display = "block";
+}
+
 function loadBlockVelocity() {
-  return fetch("/kvadstat/block_velocity.json?_shape=array&_size=5000")
-    .then(r => r.ok ? r.json() : [])
-    .then(arr => Object.fromEntries(arr.map(b => [b.block_id, b])))
-    .catch(() => ({}));
+  return fetch("/kvadstat/block_velocity.json?_shape=array&_size=5000",
+               { signal: AbortSignal.timeout(20000) })
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(arr => {
+      if (arr.length >= 5000) warnDataIssue("скорость продаж: данные усечены (5000 строк)");
+      return Object.fromEntries(arr.map(b => [b.block_id, b]));
+    })
+    .catch(() => { warnDataIssue("скорость продаж недоступна — вкладка «ЖК» неполная"); return {}; });
 }
 function loadInventory() {
-  return fetch("/kvadstat/block_inventory_daily.json?_shape=array&_size=80000")
-    .then(r => r.ok ? r.json() : [])
+  return fetch("/kvadstat/block_inventory_daily.json?_shape=array&_size=80000",
+               { signal: AbortSignal.timeout(20000) })
+    .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(arr => {
+      if (arr.length >= 80000) warnDataIssue("кривые остатка: данные усечены (80000 строк)");
+      return arr;
+    })
     .then(arr => {
       const m = {};
       for (const x of arr) (m[x.block_id] = m[x.block_id] || []).push(x);
@@ -2692,7 +2740,8 @@ function zhkCardHtml(z) {
   const klassChip = (z.klass && z.klass !== "н/д")
     ? ` · <span class="dev-tag" style="background:${KLASS_COLORS[z.klass] || "#6b7280"}">${escapeHtml(z.klass)}</span>`
     : "";
-  return `<div class="zhk-card" data-zhk-id="${z.id}">
+  return `<div class="zhk-card" data-zhk-id="${z.id}" tabindex="0" role="button"
+       aria-label="${escapeHtml(z.name)} — детали ЖК">
     <div class="zk-name">${escapeHtml(z.name)}</div>
     <div class="zk-sub">${escapeHtml(z.dev || "")}${klassChip} · ${escapeHtml(cityLabel(z.city))}${metroTxt}</div>
     <div class="zk-price">от ${fmtRub(z.minPrice)} <small>· ${z.medMeter ? Math.round(z.medMeter).toLocaleString("ru-RU") + " ₽/м²" : "—"}</small></div>
@@ -2834,16 +2883,27 @@ function setupZhkControls() {
   if (cityCount["msk"]) citySel.value = "msk";
   for (const id of ["zhkCity", "zhkDev", "zhkSort", "zhkActiveOnly"])
     document.getElementById(id).addEventListener("change", renderZhkList);
-  document.getElementById("zhkSearch").addEventListener("input", renderZhkList);
+  document.getElementById("zhkSearch").addEventListener("input",
+    debounce(renderZhkList, 150));
   document.getElementById("zhkGrid").addEventListener("click", (e) => {
     const card = e.target.closest(".zhk-card");
     if (card) location.hash = "zhk=" + card.dataset.zhkId;
   });
+  // Карточки — div'ы; без keydown клавиатурный пользователь не мог
+  // открыть детали ЖК вовсе (tabindex задан в шаблоне карточки)
+  document.getElementById("zhkGrid").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const card = e.target.closest && e.target.closest(".zhk-card");
+    if (card) { e.preventDefault(); location.hash = "zhk=" + card.dataset.zhkId; }
+  });
 }
 
 function switchTab(tab) {
-  document.querySelectorAll(".tabs button").forEach(b =>
-    b.classList.toggle("active", b.dataset.tab === tab));
+  document.querySelectorAll(".tabs button").forEach(b => {
+    const on = b.dataset.tab === tab;
+    b.classList.toggle("active", on);
+    b.setAttribute("aria-selected", on ? "true" : "false");
+  });
   document.querySelectorAll(".tab-panel").forEach(p =>
     p.classList.toggle("active", p.id === "tab-" + tab));
   const vt = document.querySelector(".view-toggle");
