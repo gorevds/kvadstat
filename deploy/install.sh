@@ -25,7 +25,11 @@ chown -R "$SVC_USER":"$SVC_USER" "$APP_DIR"
 # 3. venv с datasette
 sudo -u "$SVC_USER" python3.12 -m venv "$APP_DIR/venv"
 sudo -u "$SVC_USER" "$APP_DIR/venv/bin/pip" install --upgrade pip
-sudo -u "$SVC_USER" "$APP_DIR/venv/bin/pip" install -e "$APP_DIR[serve]"
+# Версии зависимостей зафиксированы (deploy/requirements.lock): два деплоя
+# с разницей в неделю дают одинаковое окружение, rollback воспроизводим.
+# Обновление версий = пересборка lock локально + коммит.
+sudo -u "$SVC_USER" "$APP_DIR/venv/bin/pip" install -r "$APP_DIR/deploy/requirements.lock"
+sudo -u "$SVC_USER" "$APP_DIR/venv/bin/pip" install -e "$APP_DIR" --no-deps
 
 # 4. systemd unit'ы. После R5 (2026-05-25) единый сканер — kvadstat-scan.service,
 # который сразу делает --all (10 застройщиков). kvadstat-scan-dev.{service,timer}

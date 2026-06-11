@@ -38,9 +38,12 @@ def _norm_flat(item: dict) -> NormFlat:
     `to_snapshot_row` (см. pik/mapping.py): meter_price = ставка с программой,
     price = нал. promo_price = round(meter_price * area).
     """
-    bulk = item.get("bulk") if isinstance(item.get("bulk"), dict) else {}
-    section = item.get("section") if isinstance(item.get("section"), dict) else {}
-    layout = item.get("layout") if isinstance(item.get("layout"), dict) else {}
+    bulk_raw = item.get("bulk")
+    bulk: dict = bulk_raw if isinstance(bulk_raw, dict) else {}
+    section_raw = item.get("section")
+    section: dict = section_raw if isinstance(section_raw, dict) else {}
+    layout_raw = item.get("layout")
+    layout: dict = layout_raw if isinstance(layout_raw, dict) else {}
 
     rate, mort_name = _best_mortgage(item)
     price = item.get("price")
@@ -122,8 +125,11 @@ def _norm_block(items: list[dict], block_id: int) -> NormBlock | None:
     # может быть выше дома, в котором она находится.
     floors = []
     for it in items:
-        bulk = it.get("bulk") if isinstance(it.get("bulk"), dict) else {}
+        bulk_raw = it.get("bulk")
+        bulk: dict = bulk_raw if isinstance(bulk_raw, dict) else {}
         for v in (bulk.get("floors"), it.get("floor")):
+            if v is None:
+                continue
             try:
                 floors.append(int(v))
             except (TypeError, ValueError):

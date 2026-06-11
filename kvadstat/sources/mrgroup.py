@@ -114,7 +114,8 @@ def _parse_card(href: str, text: str, block_slug: str) -> NormFlat | None:
         area=_num(area_m.group(1)) if area_m else None,
         floor=int(floor_m.group(1)) if floor_m else None,
         price=price,
-        meter_price=round(_num(ppm_m.group(1))) if ppm_m else None,
+        meter_price=(round(ppm) if ppm_m and (ppm := _num(ppm_m.group(1))) is not None
+                     else None),
         old_price=old_price,
         status="free",
         bulk_name=_building_name(bld_m.group(1)) if bld_m else None,

@@ -88,13 +88,25 @@ deprecation-шим, но новый код должен звать `bin.scan_dev
 
 ## На сервере
 
-DNS A-запись для домена → IP сервера должна быть. Дальше:
+Первичная установка (DNS A-запись для домена → IP сервера должна быть):
 
 ```bash
 sudo REPO_DIR=$PWD bash deploy/install.sh
-sudo certbot --nginx -d <domain>
+# TLS: ТОЛЬКО --webroot. `certbot --nginx` не работает за stream
+# SNI-demux на :443 (vhost слушает 127.0.0.1:8443 proxy_protocol).
+sudo certbot certonly --webroot -w /var/www/certbot -d <domain>
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+Обновления кода/статики/юнитов — НЕ через install.sh (он пересоздаёт venv
+и гоняет живой скан), а одной командой с рабочей станции:
+
+```bash
+deploy/deploy.sh root@<server>     # rsync + pip-по-надобности + restart
+```
+
+Зависимости запинены в `deploy/requirements.lock`; обновление версий =
+пересборка lock в чистом venv + коммит.
 
 Скан ежедневно в 06:00 МСК через `kvadstat-scan.timer`. Состояние:
 

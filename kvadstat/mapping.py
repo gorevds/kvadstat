@@ -65,9 +65,12 @@ def _best_mortgage(item: dict) -> tuple[float | None, str | None]:
 
 
 def to_flat_row(item: dict, *, first_seen: str) -> dict:
-    bulk = item.get("bulk") if isinstance(item.get("bulk"), dict) else {}
-    section = item.get("section") if isinstance(item.get("section"), dict) else {}
-    layout = item.get("layout") if isinstance(item.get("layout"), dict) else {}
+    bulk_raw = item.get("bulk")
+    bulk: dict = bulk_raw if isinstance(bulk_raw, dict) else {}
+    section_raw = item.get("section")
+    section: dict = section_raw if isinstance(section_raw, dict) else {}
+    layout_raw = item.get("layout")
+    layout: dict = layout_raw if isinstance(layout_raw, dict) else {}
 
     plan_url = layout.get("flat_plan_svg") or layout.get("flat_plan_render")
 

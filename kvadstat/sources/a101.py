@@ -115,6 +115,7 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     total: int | None = None
     items_seen = 0
     for _ in range(_MAX_PAGES):
+        assert url is not None  # break ниже не пускает None в новую итерацию
         payload = request_json(s, "GET", url, params=params)
         params = None  # `next` уже содержит limit/offset
         if total is None:

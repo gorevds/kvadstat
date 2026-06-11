@@ -167,7 +167,7 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
             nf = _to_norm(fl)
             if not nf: continue
             norm_flats.append(nf)
-            slug = nf.native_block_id
+            slug = str(nf.native_block_id)
             estate = fl.get("estateId") or {}
             house = fl.get("houseId") or {}
             if slug not in block_names:

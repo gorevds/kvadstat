@@ -108,7 +108,7 @@ def _to_norm(fl: dict) -> NormFlat:
              if (fl.get("id") and fl.get("project_slug")) else None),
         # Неизвестный finish_type → None (не показываем сырой en-snake-case
         # в UI). Если появится новое значение — увидим в логе с warning.
-        finish=_FINISH_MAP.get(fl.get("finish_type")),
+        finish=_FINISH_MAP.get(fl.get("finish_type") or ""),
         number=str(fl["number"]) if fl.get("number") is not None else None,
         plan_url=fl.get("plan") or fl.get("plan_png"),
     )
@@ -165,6 +165,7 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     total: int | None = None
     items_seen = 0
     for _ in range(_MAX_PAGES):
+        assert url is not None  # break ниже не пускает None в новую итерацию
         payload = request_json(s, "GET", url, params=params)
         params = None  # `next` уже содержит limit/offset
         if total is None:

@@ -62,8 +62,10 @@ class NormFlat:
     `bulk_id`/`section_id`/`layout_id` — внутренние id корпуса/секции/
     планировки (PIK); другим источникам не нужны (они в bulk_name/section_no).
     """
-    native_id: int | str
-    native_block_id: int | str
+    # None = источник не отдал ключ; build_rows отбрасывает такие строки
+    # с счётчиком skipped_noid (см. R-комментарии там)
+    native_id: int | str | None
+    native_block_id: int | str | None
     rooms: int | None = None
     area: float | None = None
     floor: int | None = None

@@ -95,7 +95,7 @@ def _section_no(fl: dict) -> int | None:
     int(«1-1») упадёт, и будет потеря данных по другим полям квартиры.
     """
     raw = fl.get("section_title")
-    if raw in (None, ""):
+    if raw is None or raw == "":
         return None
     try:
         return int(raw)
@@ -143,6 +143,7 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     total: int | None = None
     items_seen = 0
     for _ in range(_MAX_PAGES):
+        assert url is not None  # break ниже не пускает None в новую итерацию
         payload = request_json(s, "GET", url, params=params, timeout=60.0)
         params = None  # `next` уже содержит limit/offset
         if total is None:

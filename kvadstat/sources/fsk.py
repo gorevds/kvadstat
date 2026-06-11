@@ -56,8 +56,10 @@ def _to_norm(fl: dict, block_slug: str) -> NormFlat:
     wo_discount = fl.get("priceWoDiscount")
     # priceWoDiscount имеет смысл как «старая цена» только когда он выше текущей
     old_price = wo_discount if (price and wo_discount and wo_discount > price) else None
-    corpus = fl.get("corpus") if isinstance(fl.get("corpus"), dict) else {}
-    section = fl.get("section") if isinstance(fl.get("section"), dict) else {}
+    corpus_raw = fl.get("corpus")
+    corpus: dict = corpus_raw if isinstance(corpus_raw, dict) else {}
+    section_raw = fl.get("section")
+    section: dict = section_raw if isinstance(section_raw, dict) else {}
     native_id = fl.get("externalId") or fl.get("_id")
     # per-flat URL: `?id={externalId}` — рабочий шаблон, проверено curl-ом.
     # Раньше отдавали ссылку на листинг ЖК — пользователю было не понятно
@@ -134,8 +136,8 @@ def collect(
             continue
         # FSK API не отдаёт floors_max явно — оцениваем как MAX(floorNumber)
         # по квартирам ЖК (нижняя граница реальной этажности здания).
-        floors = [_to_int(it.get("floorNumber")) for it in items]
-        floors = [f for f in floors if f]
+        floors = [f for it in items
+                  if isinstance((f := _to_int(it.get("floorNumber"))), int) and f]
         blocks.append(NormBlock(
             native_id=slug,
             name=c.get("title") or slug,

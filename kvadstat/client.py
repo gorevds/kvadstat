@@ -65,7 +65,7 @@ class PikClient:
             "block_id": block_id,
             "types": ",".join(str(t) for t in types),
             "page": page,
-        }
+        }  # type: dict[str, str | int]
         last_exc: Exception | None = None
         for attempt in range(self.retries + 1):
             try:
