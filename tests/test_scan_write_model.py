@@ -51,10 +51,11 @@ def test_pik_collect_partial_failure_reports_skipped(monkeypatch):
 
 
 def test_run_developer_records_n_rejected(tmp_path, monkeypatch):
-    """Невалидная квартира (нулевая цена) не пишется, но считается в n_rejected;
-    при малой доле отбраковки (< REJECT_PARTIAL_FRACTION) статус остаётся ok —
-    штатная гигиена, не деградация. Массовая отбраковка → 'partial'
-    (см. test_run_developer_mass_rejection_is_partial в test_scan_dev.py)."""
+    """Гео-невалидная квартира не пишется и считается в n_rejected; при малой
+    доле отбраковки (< REJECT_PARTIAL_FRACTION) статус остаётся ok — штатная
+    гигиена, не деградация. Массовая отбраковка → 'partial'
+    (см. test_run_developer_mass_rejection_is_partial). Скрытая/мусорная цена
+    с 2026-06 НЕ reject: лот пишется с price=NULL (см. test_quality)."""
     db = tmp_path / "p.db"
     scan_dev._ensure_schema(db)
 
@@ -62,10 +63,13 @@ def test_run_developer_records_n_rejected(tmp_path, monkeypatch):
         good = [NormFlat(native_id=f"ok{i}", native_block_id="z", rooms=1,
                          area=40.0, floor=3, price=10_000_000)
                 for i in range(9)]
-        bad = NormFlat(native_id="bad", native_block_id="z", rooms=1,
-                       area=40.0, floor=3, price=0)  # нулевая цена
+        # ЖК с нулевыми координатами — ~7000 км от Москвы, гео-гейт отбросит
+        bad = NormFlat(native_id="bad", native_block_id="w", rooms=1,
+                       area=40.0, floor=3, price=10_000_000)
         return CollectResult(
-            blocks=[NormBlock(native_id="z", name="ЖК Z", slug="z")],
+            blocks=[NormBlock(native_id="z", name="ЖК Z", slug="z"),
+                    NormBlock(native_id="w", name="ЖК W", slug="w",
+                              meta={"latitude": 0.0, "longitude": 0.0})],
             flats=[*good, bad],
         )
 
@@ -79,6 +83,34 @@ def test_run_developer_records_n_rejected(tmp_path, monkeypatch):
     assert n_flats == 9
     assert n_rejected == 1   # 10% < порога 20% → ok
     assert status == "ok"
+
+
+def test_run_developer_hidden_price_written_as_null(tmp_path, monkeypatch):
+    """Лот со скрытой ценой попадает в snapshots с price=NULL и НЕ считается
+    отбракованным — день остаётся 'ok'."""
+    db = tmp_path / "np.db"
+    scan_dev._ensure_schema(db)
+
+    def src():
+        return CollectResult(
+            blocks=[NormBlock(native_id="z", name="ЖК Z", slug="z")],
+            flats=[NormFlat(native_id="hidden", native_block_id="z", rooms=1,
+                            area=40.0, floor=3, price=None, status="reserve"),
+                   NormFlat(native_id="ok", native_block_id="z", rooms=1,
+                            area=40.0, floor=3, price=10_000_000)],
+        )
+
+    monkeypatch.setattr(scan_dev, "SOURCES", {"ГК ФСК": src})
+    scan_dev.run_developer(db, "ГК ФСК", scan_date="2026-05-29", scan_ts="t")
+    conn = sqlite3.connect(db)
+    rows = conn.execute(
+        "SELECT price, status FROM snapshots ORDER BY price IS NULL").fetchall()
+    n_flats, n_rejected, status = conn.execute(
+        "SELECT n_flats, n_rejected, status FROM scan_runs").fetchone()
+    conn.close()
+    assert len(rows) == 2
+    assert rows[1] == (None, "reserve")
+    assert (n_flats, n_rejected, status) == (2, 0, "ok")
 
 
 def test_run_developer_records_partial_status(tmp_path, monkeypatch):

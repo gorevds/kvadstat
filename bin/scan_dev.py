@@ -25,7 +25,11 @@ from pathlib import Path
 
 from kvadstat.blocks_meta import upsert_block_meta
 from kvadstat.developers import DEVELOPERS, ID_NAMESPACE
-from kvadstat.quality import REJECT_PARTIAL_FRACTION, DataQualityStats
+from kvadstat.quality import (
+    NULLIFIED_PARTIAL_FRACTION,
+    REJECT_PARTIAL_FRACTION,
+    DataQualityStats,
+)
 from kvadstat.sources import (
     a101,
     absolut,
@@ -138,6 +142,7 @@ def run_developer(
     n_blocks = n_flats = 0
     skipped = 0
     n_rejected = 0
+    n_nullified = 0
     try:
         result = SOURCES[developer]()
         skipped = getattr(result, "skipped", 0)
@@ -146,6 +151,7 @@ def run_developer(
             developer, result, scan_date=scan_date, scan_ts=scan_ts, stats=dq
         )
         n_rejected = dq.total_rejected_flats
+        n_nullified = dq.nullified_price
         conn = sqlite3.connect(db_path)
         try:
             conn.execute("PRAGMA foreign_keys = ON")
@@ -208,6 +214,13 @@ def run_developer(
             status, msg = "partial", (
                 f"{n_rejected} из {n_flats + n_rejected} квартир отбраковано "
                 "data-quality gate (смена формата/единиц у API?)"
+            )
+        elif n_flats and n_nullified > NULLIFIED_PARTIAL_FRACTION * n_flats:
+            # Массовое обнуление цен: скрытая цена легитимна в малых дозах,
+            # но NULL у большинства = смена формата/единиц (копейки и т.п.).
+            status, msg = "partial", (
+                f"{n_nullified} из {n_flats} снапшотов с price=NULL "
+                "(смена формата/единиц у API?)"
             )
         elif n_flats == 0:
             # Сбор «успешен», но квартир ноль — у реального застройщика так

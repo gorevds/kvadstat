@@ -15,9 +15,10 @@ def _block(native_id=1, *, meta=None):
                      meta=meta or {"city": "msk"})
 
 
-def _flat(native_id=10, *, block_id=1, price=12_000_000, area=40.0):
+def _flat(native_id=10, *, block_id=1, price=12_000_000, area=40.0,
+          status=None):
     return NormFlat(native_id=native_id, native_block_id=block_id,
-                    rooms=1, area=area, price=price)
+                    rooms=1, area=area, price=price, status=status)
 
 
 def _build(blocks, flats, stats=None):
@@ -82,25 +83,39 @@ def test_geo_wrong_city_rejected():
 # --- интеграция в build_rows -------------------------------------------------
 
 
-def test_build_rows_drops_zero_price_flat():
+def test_build_rows_nullifies_zero_price_but_keeps_flat():
+    # Скрытая цена (бронь, «цена по запросу») — НЕ повод выбрасывать лот:
+    # исчезновение из snapshots породило бы ложную «продажу» в velocity.
     _bp, flat_rows, snap_rows = _build([_block()], [_flat(price=0)])
-    assert flat_rows == []
-    assert snap_rows == []
+    assert len(flat_rows) == 1
+    assert len(snap_rows) == 1
+    s = snap_rows[0]
+    assert s["price"] is None
+    assert s["promo_price"] is None
+    assert s["base_meter_price"] is None
+    assert s["meter_price"] is None
+    assert s["old_price"] is None
+    assert s["has_promo"] == 0
 
 
-def test_build_rows_drops_null_price_flat():
-    _bp, flat_rows, _sr = _build([_block()], [_flat(price=None)])
-    assert flat_rows == []
+def test_build_rows_nullified_price_preserves_status():
+    _bp, _fr, snap_rows = _build([_block()], [_flat(price=None, status="reserve")])
+    assert snap_rows[0]["status"] == "reserve"
+    assert snap_rows[0]["price"] is None
 
 
-def test_build_rows_drops_absurdly_cheap_flat():
-    _bp, flat_rows, _sr = _build([_block()], [_flat(price=PRICE_MIN - 1)])
-    assert flat_rows == []
+def test_build_rows_nullifies_absurdly_cheap_price():
+    # мусорная цена (meter_price в поле price): присутствие лота реально,
+    # цена — нет; пишем NULL вместо мусора
+    _bp, flat_rows, snap_rows = _build([_block()], [_flat(price=PRICE_MIN - 1)])
+    assert len(flat_rows) == 1
+    assert snap_rows[0]["price"] is None
 
 
-def test_build_rows_drops_absurdly_expensive_flat():
-    _bp, flat_rows, _sr = _build([_block()], [_flat(price=PRICE_MAX + 1)])
-    assert flat_rows == []
+def test_build_rows_nullifies_absurdly_expensive_price():
+    _bp, flat_rows, snap_rows = _build([_block()], [_flat(price=PRICE_MAX + 1)])
+    assert len(flat_rows) == 1
+    assert snap_rows[0]["price"] is None
 
 
 def test_build_rows_keeps_valid_flat():
@@ -132,13 +147,15 @@ def test_build_rows_fills_stats():
     ]
     flats = [
         _flat(native_id=10, block_id=1, price=12_000_000),  # ok
-        _flat(native_id=11, block_id=1, price=0),           # rejected price
+        _flat(native_id=11, block_id=1, price=0),           # nullified price
         _flat(native_id=12, block_id=2, price=9_000_000),   # rejected geo
     ]
     stats = DataQualityStats()
     _bp, flat_rows, _sr = _build(blocks, flats, stats=stats)
-    assert len(flat_rows) == 1
-    assert stats.rejected_price == 1
+    assert len(flat_rows) == 2          # лот со скрытой ценой остаётся
+    assert stats.nullified_price == 1
     assert stats.rejected_geo == 1
     assert stats.geo_bad_blocks == 1
-    assert stats.total_rejected_flats == 2
+    # nullified НЕ входит в rejected: скрытая цена — легитимное состояние,
+    # она не должна толкать день в 'partial'
+    assert stats.total_rejected_flats == 1

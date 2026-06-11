@@ -1057,15 +1057,19 @@ const columns = [
    sorter: "number",
    formatter: (c) => c.getValue() != null ? Number(c.getValue()).toFixed(1) : ""},
   {title: "База", field: "базовая_цена", hozAlign: "right", headerHozAlign: "right",
-   sorter: "number", formatter: fmtBaseWithStrike, width: 175},
+   sorter: "number", sorterParams: {alignEmptyValues: "bottom"},
+   formatter: fmtBaseWithStrike, width: 175},
   {title: "С программой", field: "цена_по_программе", hozAlign: "right", headerHozAlign: "right",
-   sorter: "number", formatter: fmtMoney, width: 195},
+   sorter: "number", sorterParams: {alignEmptyValues: "bottom"},
+   formatter: fmtMoney, width: 195},
   {title: "Скидка", field: "скидка_%", hozAlign: "right", headerHozAlign: "right",
-   sorter: "number", formatter: fmtPct, width: 110},
+   sorter: "number", sorterParams: {alignEmptyValues: "bottom"},
+   formatter: fmtPct, width: 110},
   // (колонки «Программа» и бейджа скидки убраны — flag промо уже виден
   // через подсветку строки .promo-row + значение в «Скидка %».)
   {title: "База ₽/м²", field: "база_за_м²", hozAlign: "right", headerHozAlign: "right",
-   sorter: "number", formatter: fmtMeter, width: 155},
+   sorter: "number", sorterParams: {alignEmptyValues: "bottom"},
+   formatter: fmtMeter, width: 155},
   // Оценочная арендная ставка по моей модели (см. rentMonthly).
   // field=id чтобы Tabulator пустил sorter; реально считаем на лету.
   {title: "Аренда/мес", field: "id", hozAlign: "right", headerHozAlign: "right",

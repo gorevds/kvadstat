@@ -144,3 +144,21 @@ def test_main_fails_at_exactly_twenty_pct(tmp_path, monkeypatch):
     monkeypatch.setattr(scan_dev, "SOURCES", dict.fromkeys("abcdefghi"))
     rc = scan_dev.main(["--db", str(tmp_path / "x.db"), "--all"])
     assert rc == 1
+
+
+def test_run_developer_mass_nullified_prices_is_partial(tmp_path, monkeypatch):
+    """NULL-цена у большинства снапшотов (копейки/смена формата) → 'partial'."""
+    flats = [NormFlat(native_id=f"h{i}", native_block_id="z", rooms=1,
+                      area=40.0, floor=2, price=None) for i in range(8)]
+    flats.append(NormFlat(native_id="ok", native_block_id="z", rooms=1,
+                          area=40.0, floor=2, price=10_000_000))
+    res = CollectResult(blocks=[NormBlock(native_id="z", name="Z", slug="z")],
+                        flats=flats)
+    db = tmp_path / "mn.db"
+    monkeypatch.setattr(scan_dev, "SOURCES", {"ГК ФСК": lambda: res})
+    scan_dev._ensure_schema(db)
+    scan_dev.run_developer(db, "ГК ФСК", scan_date="2026-06-11", scan_ts="t")
+    status, msg, n_flats, _ = _scan_runs_row(db)
+    assert n_flats == 9          # все лоты записаны (присутствие сохранено)
+    assert status == "partial"
+    assert "price=NULL" in msg

@@ -247,7 +247,11 @@ def build_rows(
     dup_natives: list[int | str] = []
     skipped_noid = skipped_orphan = skipped_dup = 0
     skipped_geo = skipped_price = 0
-    for f in result.flats:
+    # Валидно-ценовые копии обрабатываем первыми: при дубле global id
+    # (источник отдал лот дважды — напр. бронь со скрытой ценой + обычная
+    # запись) выигрывает копия с реальной ценой, а не та, что пришла раньше.
+    flats_ordered = sorted(result.flats, key=lambda f: not price_ok(f.price))
+    for f in flats_ordered:
         if f.native_id is None or f.native_block_id is None:
             skipped_noid += 1
             continue
@@ -262,19 +266,23 @@ def build_rows(
         if block_gid not in known_block_ids:
             skipped_orphan += 1
             continue
-        # цена 0/NULL/вне вилки — логический мусор, не пишем (см. kvadstat.quality)
-        if not price_ok(f.price):
-            skipped_price += 1
-            continue
         # коллизия id (теоретически — хеш строковых id) затёрла бы соседа
         if gid in seen_ids:
             skipped_dup += 1
             dup_natives.append(f.native_id)
             continue
         seen_ids.add(gid)
+        # Цена 0/NULL/вне вилки: лот НЕ выбрасываем — его исчезновение из
+        # snapshots выглядело бы для velocity как продажа. Пишем снапшот с
+        # NULL во всех ценовых полях: скрытая цена (бронь, «по запросу»)
+        # и мусор парсинга одинаково не значения (см. kvadstat.quality).
+        price_valid = price_ok(f.price)
+        if not price_valid:
+            skipped_price += 1
         area = f.area
-        price = f.price
-        meter_price = f.meter_price
+        price = f.price if price_valid else None
+        meter_price = f.meter_price if price_valid else None
+        old_price = f.old_price if price_valid else None
         if meter_price is None and price and area and area > 0:
             meter_price = round(price / area)
         # «база за м²» считаем от БАЗОВОЙ (списочной) цены = COALESCE(old_price,
@@ -282,9 +290,9 @@ def build_rows(
         # база_за_м² ≠ базовая_цена/площадь. Зеркалим COALESCE целиком (а не
         # только old_price>price), чтобы инвариант держался и в редком случае
         # old_price ≤ price (цена выросла выше прежней списочной).
-        base_price = f.old_price if f.old_price else price
+        base_price = old_price if old_price else price
         base_meter = round(base_price / area) if base_price and area and area > 0 else None
-        disc_abs, disc_pct, has_promo = _detect_discount(price, f.old_price)
+        disc_abs, disc_pct, has_promo = _detect_discount(price, old_price)
         rooms = f.rooms
 
         is_apart = bool(f.is_apartment) or block_apart_hint.get(block_gid, False)
@@ -323,7 +331,9 @@ def build_rows(
         #    promo_price = price (нет отдельной «программы»), discount =
         #    old_price → price.
         # 3) Ни того, ни другого: promo_price = price, has_promo = 0.
-        if f.promo_price is not None:
+        if not price_valid:
+            promo_price = None  # цена скрыта — промо-семантика не применима
+        elif f.promo_price is not None:
             promo_price = f.promo_price
             if f.discount_pct is not None:
                 disc_pct = f.discount_pct
@@ -351,7 +361,7 @@ def build_rows(
             "promo_price": promo_price,
             "discount_pct": disc_pct,
             "has_promo": has_promo,
-            "old_price": f.old_price,
+            "old_price": old_price,
             "discount": disc_abs,
             "finish": f.finish,
             "mortgage_min_rate": f.mortgage_min_rate,
@@ -363,7 +373,7 @@ def build_rows(
             or skipped_price or skipped_geo or geo_bad_blocks):
         log.warning(
             "%s: пропущено квартир — без id: %d, без ЖК: %d, дубль id: %d, "
-            "цена: %d, гео: %d (+ ЖК по гео: %d)",
+            "цена→NULL: %d, гео: %d (+ ЖК по гео: %d)",
             developer, skipped_noid, skipped_orphan, skipped_dup,
             skipped_price, skipped_geo, geo_bad_blocks,
         )
@@ -374,7 +384,7 @@ def build_rows(
             log.warning("%s: native id с конфликтом global id: %s",
                         developer, dup_natives)
     if stats is not None:
-        stats.rejected_price = skipped_price
+        stats.nullified_price = skipped_price
         stats.rejected_geo = skipped_geo
         stats.geo_bad_blocks = geo_bad_blocks
     return block_payloads, flat_rows, snap_rows
