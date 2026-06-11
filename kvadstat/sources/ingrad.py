@@ -21,6 +21,7 @@ from kvadstat.sources.base import (
     NormFlat,
     make_session,
     request_json,
+    totals_deficit,
 )
 
 DEVELOPER = "Инград"
@@ -145,6 +146,9 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     block_names: dict[str, str] = {}
 
     page = 1
+    skipped = 0
+    total: int | None = None
+    items_seen = 0
     for _ in range(_MAX_PAGES):
         # API ингреда регулярно отвечает 30-60 сек на полный list — дефолт
         # 40s даёт false-negative при нормальной работе. 90s + ретраи из
@@ -154,6 +158,9 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
             params={"numberElementsPage": _PAGE_SIZE, "page": page, "type": "flat"},
         )
         items = payload.get("list") or []
+        if total is None:
+            total = payload.get("allCount")
+        items_seen += len(items)
         if not items:
             break
         for fl in items:
@@ -183,11 +190,18 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
                     cur = pm.get("floors_max") or 0
                     if fc > cur:
                         pm["floors_max"] = fc
-        if len(items) < _PAGE_SIZE:
-            break
+        # NB: короткая страница — НЕ конец каталога (сервер может урезать
+        # page size молча); идём до пустой страницы, это +1 запрос
         page += 1
     else:
-        log.warning("Инград: достигнут предел в %d страниц", _MAX_PAGES)
+        log.warning("Инград: достигнут предел в %d страниц — хвост потерян", _MAX_PAGES)
+        skipped += 1
+    if totals_deficit(total, items_seen):
+        # TODO(live-check): не переводим в skipped, пока не подтверждено, что
+        # allCount учитывает фильтр type=flat (если это общий счётчик с
+        # офисами/кладовками — был бы вечный ложный partial). Пока лог-only.
+        log.warning("Инград: собрано %d из %s заявленных allCount — возможен недобор",
+                    items_seen, total)
 
     norm_blocks = [
         NormBlock(native_id=slug, name=name, slug=slug,
@@ -195,4 +209,4 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         for slug, name in block_names.items()
     ]
     log.info("Инград: %d ЖК, %d квартир", len(norm_blocks), len(norm_flats))
-    return CollectResult(blocks=norm_blocks, flats=norm_flats)
+    return CollectResult(blocks=norm_blocks, flats=norm_flats, skipped=skipped)

@@ -30,7 +30,6 @@ DEVELOPER = "Донстрой"
 _FLATS_URL = "https://donstroy.moscow/api/v1/flatssearch/choose_params_api_flats/"
 _OBJECT_URL_FMT = "https://donstroy.moscow/objects/{slug}/"
 _SITE = "https://donstroy.moscow"
-_PAGE_SIZE = 12        # фиксировано сервером, тело per_page игнорируется
 _MAX_PAGES = 400       # предохранитель от бесконечной пагинации
 # Googlebot UA пускает за ServicePipe анти-бота к /objects/<slug>/.
 # Обычным UA эти страницы возвращают пустой шаблон.
@@ -134,6 +133,7 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     block_slugs: dict[str, str | None] = {}  # project name → slug (из link)
     block_floors: dict[str, int] = {}        # project name → max(floors_total)
 
+    skipped = 0
     for page in range(1, _MAX_PAGES + 1):
         payload = request_json(
             s, "POST", _FLATS_URL, json={"page": page},
@@ -150,10 +150,12 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
             if ft:
                 block_floors[project] = max(block_floors.get(project, 0), ft)
             norm_flats.append(_to_norm(fl))
-        if len(flats) < _PAGE_SIZE:
-            break
+        # NB: len(flats) < page size НЕ означает конец: сервер может молча
+        # сменить фиксированный размер страницы (12) — идём до пустой
     else:
-        log.warning("Донстрой: достигнут предел в %d страниц", _MAX_PAGES)
+        log.warning("Донстрой: достигнут предел в %d страниц — хвост потерян",
+                    _MAX_PAGES)
+        skipped += 1
 
     # Метро/координаты — HTML-скрейп страницы ЖК (один запрос на ЖК,
     # 10 ЖК = ~10с). Не критично если упадёт: build_rows подставит city
@@ -173,4 +175,4 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         for name, slug in block_slugs.items()
     ]
     log.info("Донстрой: %d ЖК, %d квартир", len(blocks), len(norm_flats))
-    return CollectResult(blocks=blocks, flats=norm_flats)
+    return CollectResult(blocks=blocks, flats=norm_flats, skipped=skipped)

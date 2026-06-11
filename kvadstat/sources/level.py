@@ -18,6 +18,7 @@ from kvadstat.sources.base import (
     make_session,
     request_json,
     safe_next_url,
+    totals_deficit,
 )
 
 DEVELOPER = "Level"
@@ -25,7 +26,7 @@ _FLATS_URL = "https://level.ru/api/flat/"
 _PROJECTS_URL = "https://level.ru/api/project/"
 _SITE = "https://level.ru"
 _PAGE_LIMIT = 100   # limit>=500 у API таймаутит
-_MAX_PAGES = 60
+_MAX_PAGES = 120  # 100×120 = 12k квартир: запас ×2 над реальным стоком Level
 
 log = logging.getLogger("kvadstat.sources.level")
 
@@ -138,9 +139,15 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
 
     url: str | None = _FLATS_URL
     params: dict | None = {"limit": _PAGE_LIMIT, "offset": 0}
+    skipped = 0
+    total: int | None = None
+    items_seen = 0
     for _ in range(_MAX_PAGES):
         payload = request_json(s, "GET", url, params=params, timeout=60.0)
         params = None  # `next` уже содержит limit/offset
+        if total is None:
+            total = payload.get("count")
+        items_seen += len(payload.get("results") or [])
         for fl in payload.get("results") or []:
             slug = fl.get("project_slug") or fl.get("project")
             if not fl.get("pk") or not slug:
@@ -157,9 +164,16 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         url = safe_next_url(nxt, "level.ru")
         if not url:
             log.warning("Level: подозрительный next %r, прерываю обход", nxt)
+            skipped += 1
             break
     else:
-        log.warning("Level: достигнут предел в %d страниц", _MAX_PAGES)
+        log.warning("Level: достигнут предел в %d страниц — хвост потерян", _MAX_PAGES)
+        skipped += 1
+    if not skipped and totals_deficit(total, items_seen):
+        # not skipped: обрыв по MAX_PAGES/подозрительному next уже посчитан,
+        # дефицит — следствие того же события, не считаем его дважды
+        log.warning("Level: собрано %d из %s заявленных — недобор", items_seen, total)
+        skipped += 1
 
     project_meta = _fetch_project_meta(s)
     norm_blocks = [
@@ -170,4 +184,4 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         for slug, name in blocks.items()
     ]
     log.info("Level: %d ЖК, %d квартир", len(norm_blocks), len(norm_flats))
-    return CollectResult(blocks=norm_blocks, flats=norm_flats)
+    return CollectResult(blocks=norm_blocks, flats=norm_flats, skipped=skipped)

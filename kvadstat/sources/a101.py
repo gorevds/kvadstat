@@ -17,6 +17,7 @@ from kvadstat.sources.base import (
     make_session,
     request_json,
     safe_next_url,
+    totals_deficit,
 )
 
 DEVELOPER = "А101"
@@ -110,9 +111,15 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     # цена меняется, и квартиры «переезжали» бы через границу offset между
     # запросами страниц (часть терялась бы или дублировалась за один скан).
     params: dict | None = {"limit": _PAGE_LIMIT, "offset": 0}
+    skipped = 0
+    total: int | None = None
+    items_seen = 0
     for _ in range(_MAX_PAGES):
         payload = request_json(s, "GET", url, params=params)
         params = None  # `next` уже содержит limit/offset
+        if total is None:
+            total = payload.get("count")
+        items_seen += len(payload.get("results") or [])
         for fl in payload.get("results") or []:
             if not fl.get("id") or not fl.get("project_slug"):
                 continue
@@ -130,9 +137,16 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         url = safe_next_url(nxt, "a101.ru")
         if not url:
             log.warning("А101: подозрительный next %r, прерываю обход", nxt)
+            skipped += 1
             break
     else:
-        log.warning("А101: достигнут предел в %d страниц", _MAX_PAGES)
+        log.warning("А101: достигнут предел в %d страниц — хвост потерян", _MAX_PAGES)
+        skipped += 1
+    if not skipped and totals_deficit(total, items_seen):
+        # not skipped: обрыв по MAX_PAGES/подозрительному next уже посчитан,
+        # дефицит — следствие того же события, не считаем его дважды
+        log.warning("А101: собрано %d из %s заявленных — недобор", items_seen, total)
+        skipped += 1
 
     # Метро/координаты/адрес — только в detail-эндпоинте проекта; list-эндпоинт
     # отдаёт metro_set, но без coords. Тянем detail по каждому из 9 проектов
@@ -157,4 +171,4 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         for slug, name in blocks.items()
     ]
     log.info("А101: %d ЖК, %d квартир", len(norm_blocks), len(norm_flats))
-    return CollectResult(blocks=norm_blocks, flats=norm_flats)
+    return CollectResult(blocks=norm_blocks, flats=norm_flats, skipped=skipped)

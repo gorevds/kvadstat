@@ -197,8 +197,8 @@ def _collect_region(session: requests.Session, region: str, city_code: str) -> C
                    "native_id": pref_flat,
                    "native_block_id": pref_block}
             ))
-        if len(items) < _PAGE_LIMIT:
-            break
+        # NB: короткая страница — не конец (сервер может урезать limit);
+        # конец каталога = пустая страница, ценой +1 запроса на регион
         page += 1
     else:
         log.warning("Брусника [%s]: достигнут предел %d страниц", region, _MAX_PAGES)

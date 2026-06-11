@@ -380,6 +380,26 @@ def build_rows(
     return block_payloads, flat_rows, snap_rows
 
 
+def totals_deficit(total: object, seen: int, *, tolerance: float = 0.98) -> bool:
+    """True, если API заявил суммарный счётчик, а собрано заметно меньше.
+
+    Единственная надёжная детекция молча срезанной пагинации (сервер урезал
+    page size, отвалился хвост, фильтр сместился): сравниваем собранные
+    сырые элементы с totalCount/allCount/count, который API сам же отдаёт.
+    total None/0/не-число → API счётчик не отдал, судить не о чем → False.
+    Числовые строки ("478") приводим — сериализаторы дрейфуют int→str, и
+    детектор не должен молча отключаться. bool исключаем явно (True == 1).
+    Допуск 2% — на гонку каталога (квартиры уходят между страницами обхода).
+    """
+    if isinstance(total, bool):
+        return False
+    try:
+        t = float(total)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return False
+    return t > 0 and seen < tolerance * t
+
+
 def safe_next_url(url: str | None, allowed_host: str) -> str | None:
     """Возвращает URL, если хост == allowed_host или его поддомен; иначе None.
 

@@ -413,16 +413,20 @@ def test_donstroy_to_norm_hides_price_on_request():
 
 def test_donstroy_collect_paginates_and_dedups_blocks(monkeypatch):
     fixture = json.load(open(FIXTURES / "donstroy_flats.json"))
-    full = fixture[:1] * donstroy._PAGE_SIZE  # полная страница → пагинация продолжится
-    pages = {1: full, 2: fixture[:1]}         # стр.2 короткая → стоп
+    full = fixture[:1] * 12                   # типовая полная страница
+    pages = {1: full, 2: fixture[:1]}         # стр.3 пустая → стоп
+    calls = []
 
     def fake_request_json(session, method, url, *, json=None, **kw):
+        calls.append(json["page"])
         return {"flats": pages.get(json["page"], [])}
 
     monkeypatch.setattr("kvadstat.sources.donstroy.request_json", fake_request_json)
     result = donstroy.collect()
-    # стр.1 — 12 квартир (полная), стр.2 — 1 (короткая, стоп) → 13 квартир
-    assert len(result.flats) == donstroy._PAGE_SIZE + 1
+    # стр.1 — 12 квартир, стр.2 — 1 (короткая — НЕ повод останавливаться),
+    # стр.3 — пустая → стоп. Итого 13 квартир за 3 запроса.
+    assert len(result.flats) == 13
+    assert calls == [1, 2, 3]
     # один ЖК на все карточки — блок без дублей
     assert {b.name for b in result.blocks} == {"Символ"}
 
@@ -828,7 +832,7 @@ def test_ingrad_second_house_fills_missing_coords(monkeypatch):
                       "address": "Москва, ул. Y", "floorsCount": 25}},
     ]}]
     monkeypatch.setattr("kvadstat.sources.ingrad.request_json",
-                        lambda *a, **k: pages.pop(0))
+                        lambda *a, **k: pages.pop(0) if pages else {"list": []})
     result = ingrad.collect()
     b = result.blocks[0]
     assert b.meta["latitude"] == 55.7
@@ -867,7 +871,7 @@ def test_ingrad_collect_aggregates_block_meta(monkeypatch):
         {"type": "office", "id": 99, "estateId": {"code": "foo"}, "houseId": {}},
     ]}]
     monkeypatch.setattr("kvadstat.sources.ingrad.request_json",
-                        lambda *a, **k: pages.pop(0))
+                        lambda *a, **k: pages.pop(0) if pages else {"list": []})
     result = ingrad.collect()
     assert len(result.flats) == 2  # офис отброшен
     b = result.blocks[0]
@@ -944,9 +948,11 @@ def test_brusnika_collect_region_prefixes_slug(monkeypatch):
          "tags": ["Без отделки"]},
     ]}]
     monkeypatch.setattr("kvadstat.sources.brusnika.request_json",
-                        lambda s, m, u, **kw: pages.pop(0) if "/flats/" in u
-                        else [{"id": 79, "latitude": 55.81, "longitude": 37.75,
-                                "subway": [{"name": "Бульвар Рокоссовского"}]}])
+                        lambda s, m, u, **kw:
+                        ((pages.pop(0) if pages else {"results": []})
+                         if "/flats/" in u
+                         else [{"id": 79, "latitude": 55.81, "longitude": 37.75,
+                                "subway": [{"name": "Бульвар Рокоссовского"}]}]))
     result = brusnika._collect_region(brusnika.make_session(), "moskva", "msk")
     assert len(result.flats) == 1
     assert len(result.blocks) == 1
@@ -1188,3 +1194,86 @@ def test_brusnika_total_failure_raises(monkeypatch):
     import pytest as _pytest
     with _pytest.raises(_SE):
         brusnika.collect()
+
+
+# --- T2: целостность пагинации (totals + MAX_PAGES) ----------------------
+
+def test_absolut_undercollection_counts_skipped(monkeypatch):
+    """API заявил totalCount=100, собрали 1 — деградация должна быть видна."""
+    node = {"pk": "p1", "project": {"slug": "p", "name": "P"}}
+    payload = {"data": {"allFlats": {
+        "totalCount": 100,
+        "edges": [{"node": node}],
+        "pageInfo": {"endCursor": None, "hasNextPage": False},
+    }}}
+    monkeypatch.setattr("kvadstat.sources.absolut.request_json",
+                        lambda *a, **k: payload)
+    r = absolut.collect()
+    assert len(r.flats) == 1
+    assert r.skipped >= 1
+
+
+def test_a101_undercollection_counts_skipped(monkeypatch):
+    def fake(session, method, url, **kw):
+        if "/projects/" in url:
+            return {}
+        return {"count": 100, "next": None, "results": [
+            {"id": 1, "project_slug": "p", "project": "P",
+             "actual_price": 5_000_000, "room": 1, "studio": False}]}
+    monkeypatch.setattr("kvadstat.sources.a101.request_json", fake)
+    r = a101.collect()
+    assert len(r.flats) == 1
+    assert r.skipped >= 1
+
+
+def test_ingrad_undercollection_counts_skipped(monkeypatch):
+    pages = [{"allCount": 50, "list": [
+        {"type": "flat", "id": 1, "price": 5_000_000, "square": 30, "rooms": 1,
+         "status": "free", "link": "/p/foo/flats/1/",
+         "estateId": {"code": "foo", "name": "Foo"}, "houseId": {}}]}]
+    monkeypatch.setattr("kvadstat.sources.ingrad.request_json",
+                        lambda *a, **k: pages.pop(0) if pages else {"list": []})
+    r = ingrad.collect()
+    # TODO(live-check): пока allCount-дефицит только логируется (семантика
+    # счётчика не подтверждена) — skipped не растёт
+    assert r.skipped == 0
+
+
+def test_totals_check_skips_when_api_silent(monkeypatch):
+    """Нет count в ответе (или 0) — проверка полноты не фантомит skipped."""
+    def fake(session, method, url, **kw):
+        if "/projects/" in url:
+            return {}
+        return {"next": None, "results": [
+            {"id": 1, "project_slug": "p", "project": "P",
+             "actual_price": 5_000_000, "room": 1, "studio": False}]}
+    monkeypatch.setattr("kvadstat.sources.a101.request_json", fake)
+    assert a101.collect().skipped == 0
+
+
+def test_ingrad_max_pages_counts_skipped(monkeypatch):
+    """Упёрлись в предохранитель страниц — хвост каталога потерян → skipped."""
+    monkeypatch.setattr(ingrad, "_MAX_PAGES", 1)
+    monkeypatch.setattr(ingrad, "_PAGE_SIZE", 1)
+    flat = {"type": "flat", "id": 1, "price": 5_000_000, "square": 30,
+            "rooms": 1, "status": "free", "link": "/p/foo/flats/1/",
+            "estateId": {"code": "foo", "name": "Foo"}, "houseId": {}}
+    monkeypatch.setattr("kvadstat.sources.ingrad.request_json",
+                        lambda *a, **k: {"list": [flat]})
+    r = ingrad.collect()
+    assert r.skipped >= 1
+
+
+def test_donstroy_max_pages_counts_skipped(monkeypatch):
+    monkeypatch.setattr(donstroy, "_MAX_PAGES", 1)
+
+    def fake_json(session, method, url, **kw):
+        return {"flats": [{"project": "Остров", "price": 10_000_000,
+                           "link": "/objects/ostrov/x/"}]}
+    monkeypatch.setattr("kvadstat.sources.donstroy.request_json", fake_json)
+    # HTML-мета ЖК не нужна тесту — мокаем реальный символ, чтобы не было
+    # живого HTTP к donstroy.moscow
+    monkeypatch.setattr("kvadstat.sources.donstroy._fetch_block_meta_html",
+                        lambda *a, **k: {})
+    r = donstroy.collect()
+    assert r.skipped >= 1

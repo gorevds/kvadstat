@@ -16,6 +16,7 @@ from kvadstat.sources.base import (
     SourceError,
     make_session,
     request_json,
+    totals_deficit,
 )
 
 DEVELOPER = "Абсолют"
@@ -131,6 +132,9 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     project_meta: dict[str, dict] = {}  # slug → метро/координаты/адрес
 
     after: str | None = None
+    skipped = 0
+    total: int | None = None
+    items_seen = 0
     for _ in range(_MAX_PAGES):
         payload = request_json(
             s, "POST", _GRAPHQL_URL,
@@ -145,6 +149,9 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         if payload.get("errors"):
             raise SourceError(f"GraphQL errors: {payload['errors']}")
         conn = (payload.get("data") or {}).get("allFlats") or {}
+        if total is None:
+            total = conn.get("totalCount")
+        items_seen += len(conn.get("edges") or [])
         for edge in conn.get("edges") or []:
             node = edge.get("node") or {}
             slug = (node.get("project") or {}).get("slug")
@@ -167,7 +174,14 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
             break
         after = page_info.get("endCursor")
     else:
-        log.warning("Абсолют: достигнут предел в %d страниц", _MAX_PAGES)
+        log.warning("Абсолют: достигнут предел в %d страниц — хвост потерян",
+                    _MAX_PAGES)
+        skipped += 1
+    if not skipped and totals_deficit(total, items_seen):
+        # not skipped: обрыв по MAX_PAGES/подозрительному next уже посчитан,
+        # дефицит — следствие того же события, не считаем его дважды
+        log.warning("Абсолют: собрано %d из %s заявленных — недобор", items_seen, total)
+        skipped += 1
 
     norm_blocks = [
         NormBlock(
@@ -176,5 +190,6 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         )
         for slug, name in blocks.items()
     ]
-    log.info("Абсолют: %d ЖК, %d квартир", len(norm_blocks), len(norm_flats))
-    return CollectResult(blocks=norm_blocks, flats=norm_flats)
+    log.info("Абсолют: %d ЖК, %d квартир (%d пропущено)",
+             len(norm_blocks), len(norm_flats), skipped)
+    return CollectResult(blocks=norm_blocks, flats=norm_flats, skipped=skipped)
