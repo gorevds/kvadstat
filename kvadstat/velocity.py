@@ -33,6 +33,20 @@ from datetime import date, timedelta
 
 # Дневной объём застройщика ниже этой доли от медианы → частичный скан, не в счёт.
 FULL_SCAN_FRACTION = 0.5
+# Медиану дневного объёма считаем ТРЕЙЛИНГОВО — по N датам, предшествующим
+# оцениваемому дню (включительно), а не по всей истории: глобальная медиана
+# нестационарна — распродажа (каталог сжался ниже 50% исторической медианы)
+# навсегда замораживала бы детект «полных» дней, а подключение новых ЖК
+# ретроактивно дисквалифицировало бы старые (до роста) дни. Трейлинговое
+# окно «заживает» после структурного сдвига примерно за N/2 дней и судит
+# каждый день по статистике его эпохи.
+ROLLING_MEDIAN_DATES = 60
+# День со status='partial' в scan_runs исключаем, только если объём дня и
+# по счёту просел ниже этой доли от медианы: телеметрия говорит «деградация»,
+# счёт подтверждает. Иначе хронический partial (один мёртвый slug в реестре
+# на недели) заморозил бы gone-детект целиком, а потом отдал бы весь бэклог
+# «исчезновений» одним днём. status='error' исключается безусловно.
+PARTIAL_DAY_CONFIRM_FRACTION = 0.9
 # Сколько полных сканов застройщика после last_seen нужно, чтобы признать «ушёл».
 GONE_PERSIST = 2
 # Для кривой остатка: день учитывается, если глобальный дневной объём ≥ этой доли
@@ -57,7 +71,13 @@ def _to_date(s: str | None) -> date | None:
 def _full_scan_dates(conn: sqlite3.Connection) -> dict[str, list[str]]:
     """developer → отсортированный список дат, где был ПОЛНЫЙ скан застройщика.
 
-    Полный = дневное число лотов ≥ FULL_SCAN_FRACTION × медиана по застройщику.
+    Полный =
+      1) в scan_runs нет записи (dev, date) со status='error' (безусловное
+         исключение) и нет 'partial' с подтверждённым счётом провалом
+         (см. PARTIAL_DAY_CONFIRM_FRACTION); дни до телеметрии проходят
+         автоматически (записи нет);
+      2) дневное число лотов ≥ FULL_SCAN_FRACTION × трейлинговая медиана
+         по ROLLING_MEDIAN_DATES датам, предшествующим дню (см. константы).
     Так частичные/упавшие дни не дают ложных «исчезновений».
     """
     rows = conn.execute(
@@ -69,15 +89,32 @@ def _full_scan_dates(conn: sqlite3.Connection) -> dict[str, list[str]]:
         GROUP BY b.developer, s.scan_date
         """
     ).fetchall()
+    run_status: dict[tuple[str, str], str] = {
+        (dev, d): st for d, dev, st in conn.execute(
+            "SELECT scan_date, developer, status FROM scan_runs "
+            "WHERE status != 'ok'"
+        )
+    }
     by_dev: dict[str, list[tuple[str, int]]] = defaultdict(list)
     for dev, d, c in rows:
+        if run_status.get((dev, d)) == "error":
+            continue  # и из кандидатов, и из медианы: счёт дня не показателен
         by_dev[dev].append((d, c))
     full: dict[str, list[str]] = {}
     for dev, lst in by_dev.items():
+        lst.sort()  # по дате (ISO — лексикографически == хронологически)
         counts = [c for _, c in lst]
-        med = statistics.median(counts) if counts else 0
-        thr = FULL_SCAN_FRACTION * med
-        full[dev] = sorted(d for d, c in lst if c >= thr)
+        days: list[str] = []
+        for i, (d, c) in enumerate(lst):
+            window = counts[max(0, i - ROLLING_MEDIAN_DATES + 1): i + 1]
+            med = statistics.median(window)
+            if c < FULL_SCAN_FRACTION * med:
+                continue
+            if (run_status.get((dev, d)) == "partial"
+                    and c < PARTIAL_DAY_CONFIRM_FRACTION * med):
+                continue  # телеметрия + счёт согласны: день деградирован
+            days.append(d)
+        full[dev] = days
     return full
 
 
@@ -114,8 +151,11 @@ def build_flat_lifecycle(conn: sqlite3.Connection, full=None) -> None:
         scans_after = len(after)
         gone = 1 if scans_after >= GONE_PERSIST else 0
         gone_date = after[0] if gone else None
-        # still_listed — присутствовал в последнем полном скане застройщика
-        still = 1 if scans_after == 0 else 0
+        # still_listed: лот активен, пока уход НЕ подтверждён (лимбо —
+        # пропуск 1 из GONE_PERSIST сканов — считается активным; при 47%
+        # мерцания иначе живой инвентарь ежедневно выпадал бы из active_now,
+        # завышая absorption_pct).
+        still = 1 if scans_after < GONE_PERSIST else 0
         gd, fd = _to_date(gone_date), _to_date(first)
         dom = (gd - fd).days if (gone and gd and fd) else None
         out.append((fid, bid, dev, bulk, rooms, first, last,

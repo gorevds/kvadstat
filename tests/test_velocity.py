@@ -94,7 +94,10 @@ def test_pending_one_scan_after_is_not_yet_gone():
     build_flat_lifecycle(c)
     lc = _lc(c, 10)
     assert lc["gone"] == 0   # ещё не подтверждён уход
-    assert lc["still"] == 0  # но и не в последнем скане
+    # Лимбо-лот (1 пропуск из GONE_PERSIST=2) считается АКТИВНЫМ: при 47%
+    # мерцания иначе заметная доля живого инвентаря ежедневно выпадала бы
+    # из active_now, завышая absorption_pct.
+    assert lc["still"] == 1
 
 
 def test_flapping_reappearance_not_counted_as_gone():
@@ -272,3 +275,115 @@ def test_inventory_curve_excludes_partial_scan_days():
     ).fetchall()]
     assert "2026-06-03" not in days  # частичный день исключён из кривой
     assert days == ["2026-06-01", "2026-06-02", "2026-06-04", "2026-06-05"]
+
+
+def test_full_dates_exclude_error_days_unconditionally():
+    """День с status='error' исключается, даже если лотов записалось много
+    (упали после частичной записи)."""
+    c = _conn()
+    _block(c, 1)
+    for fid in range(100, 120):
+        _flat(c, fid, 1)
+        _present(c, fid, [1, 2, 3])
+    c.execute(
+        "INSERT INTO scan_runs (scan_date, scan_ts, developer, status) "
+        "VALUES ('2026-06-02', 't', 'ПИК', 'error')"
+    )
+    full = _full_scan_dates(c)
+    assert "2026-06-02" not in full["ПИК"]
+    assert "2026-06-01" in full["ПИК"]
+    assert "2026-06-03" in full["ПИК"]
+
+
+def test_full_dates_exclude_partial_day_with_confirmed_dip():
+    """partial + счёт просел (70% медианы — выше FULL_SCAN_FRACTION, старая
+    эвристика сочла бы день полным) → исключён."""
+    c = _conn()
+    _block(c, 1)
+    for fid in range(100, 114):          # 14 лотов есть все 3 дня
+        _flat(c, fid, 1)
+        _present(c, fid, [1, 2, 3])
+    for fid in range(114, 120):          # 6 лотов выпали в день 2 (антибот)
+        _flat(c, fid, 1)
+        _present(c, fid, [1, 3])
+    c.execute(
+        "INSERT INTO scan_runs (scan_date, scan_ts, developer, status) "
+        "VALUES ('2026-06-02', 't', 'ПИК', 'partial')"
+    )
+    full = _full_scan_dates(c)
+    assert "2026-06-02" not in full["ПИК"]
+    assert "2026-06-01" in full["ПИК"]
+    assert "2026-06-03" in full["ПИК"]
+
+
+def test_full_dates_keep_chronic_partial_with_normal_counts():
+    """Хронический partial (мёртвый slug в реестре) при НОРМАЛЬНОМ объёме
+    остаётся полным днём — иначе velocity замерзает на недели, а потом
+    отдаёт бэклог «исчезновений» одним днём."""
+    c = _conn()
+    _block(c, 1)
+    for fid in range(100, 120):
+        _flat(c, fid, 1)
+        _present(c, fid, [1, 2, 3])
+    for day in (1, 2, 3):
+        c.execute(
+            "INSERT INTO scan_runs (scan_date, scan_ts, developer, status) "
+            f"VALUES ('2026-06-{day:02d}', 't', 'ПИК', 'partial')"
+        )
+    full = _full_scan_dates(c)
+    assert full["ПИК"] == ["2026-06-01", "2026-06-02", "2026-06-03"]
+
+
+def test_rolling_median_adapts_to_shrunk_catalog():
+    """Распродажа: каталог сжался со 100 до 30 лотов и живёт так 40 дней.
+
+    Медиана по ВСЕЙ истории (100 дней) дала бы порог 50 → свежие дни
+    никогда не «полные» → gone замерзает навсегда. Скользящая медиана по
+    последним ROLLING_MEDIAN_DATES датам обязана признать новый уровень."""
+    from datetime import date, timedelta
+    c = _conn()
+    _block(c, 1)
+    d0 = date(2026, 1, 1)
+    rows = []
+    for day in range(100):
+        d = (d0 + timedelta(days=day)).isoformat()
+        n = 100 if day < 60 else 30
+        for fid in range(1000, 1000 + n):
+            rows.append((fid, d, d + "T06:00:00", "free", 10_000_000))
+    for fid in range(1000, 1100):
+        c.execute(
+            "INSERT INTO flats (id, guid, block_id, rooms, first_seen) "
+            "VALUES (?,?,1,'1','2026-01-01')", (fid, str(fid)))
+    c.executemany(
+        "INSERT INTO snapshots (flat_id, scan_date, scan_ts, status, price, has_promo) "
+        "VALUES (?,?,?,?,?,0)", rows)
+    full = _full_scan_dates(c)
+    last_day = (d0 + timedelta(days=99)).isoformat()
+    assert last_day in full["ПИК"], "свежий «сжатый» день должен быть полным"
+
+
+def test_trailing_median_does_not_retro_disqualify_pregrowth_days():
+    """Рост каталога ×3 не должен ретроактивно делать старые дни «неполными»:
+    каждый день судится по медиане СВОЕЙ эпохи (трейлинговое окно)."""
+    from datetime import date, timedelta
+    c = _conn()
+    _block(c, 1)
+    d0 = date(2026, 1, 1)
+    rows = []
+    for day in range(120):
+        d = (d0 + timedelta(days=day)).isoformat()
+        n = 30 if day < 70 else 100      # рост с 30 до 100 лотов на 70-й день
+        for fid in range(1000, 1000 + n):
+            rows.append((fid, d, d + "T06:00:00", "free", 10_000_000))
+    for fid in range(1000, 1100):
+        c.execute(
+            "INSERT INTO flats (id, guid, block_id, rooms, first_seen) "
+            "VALUES (?,?,1,'1','2026-01-01')", (fid, str(fid)))
+    c.executemany(
+        "INSERT INTO snapshots (flat_id, scan_date, scan_ts, status, price, has_promo) "
+        "VALUES (?,?,?,?,?,0)", rows)
+    full = _full_scan_dates(c)
+    early = (d0 + timedelta(days=10)).isoformat()
+    late = (d0 + timedelta(days=119)).isoformat()
+    assert early in full["ПИК"], "день до роста полон по меркам своей эпохи"
+    assert late in full["ПИК"]
