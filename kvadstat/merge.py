@@ -69,7 +69,11 @@ def merge_databases(
             if blocks_cols_src:
                 meta_in_src = [c for c in _BLOCK_META_COLS if c in blocks_cols_src]
                 dev_col = "developer" if "developer" in blocks_cols_src else "'ПИК' AS developer"
-                cols = ["id", "name", dev_col, "slug"] + meta_in_src
+                # slug тоже опционален в легаси-агентских БД — без guard'а
+                # merge падал бы с "no such column", от чего докстринг
+                # модуля как раз обещает защищать
+                slug_col = "slug" if "slug" in blocks_cols_src else "NULL AS slug"
+                cols = ["id", "name", dev_col, slug_col] + meta_in_src
                 cur = conn.cursor()
                 cur.execute(f"SELECT {', '.join(cols)} FROM src.blocks")
                 rows = cur.fetchall()

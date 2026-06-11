@@ -13,6 +13,8 @@ import sqlite3
 import time
 from collections import defaultdict
 from collections.abc import Iterable
+from contextlib import closing
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import requests
@@ -20,6 +22,8 @@ import requests
 from .client import DEFAULT_UA
 from .mapping import to_flat_row, to_snapshot_row
 from .store import apply_schema, upsert
+
+_MSK = timezone(timedelta(hours=3))
 
 log = logging.getLogger("kvadstat.backfill")
 
@@ -167,8 +171,14 @@ def _to_api_v2_shape(wb_flat: dict, *, block_id: int) -> dict:
 
 
 def _wayback_date(timestamp: str) -> str:
-    """20250629055318 -> 2025-06-29."""
-    return f"{timestamp[0:4]}-{timestamp[4:6]}-{timestamp[6:8]}"
+    """20250629055318 (UTC) -> московская дата снимка.
+
+    Все scan_date в БД — даты МСК; UTC-снимок 21:00-24:00 без конверсии
+    ложился бы «вчерашним» днём относительно остальной истории.
+    """
+    dt = datetime.strptime(timestamp[:14], "%Y%m%d%H%M%S").replace(
+        tzinfo=timezone.utc)
+    return dt.astimezone(_MSK).date().isoformat()
 
 
 def _wayback_iso(timestamp: str) -> str:
@@ -264,14 +274,22 @@ def backfill(
             snap_row = to_snapshot_row(
                 api_shape, scan_date=scan_date, scan_ts=scan_ts
             )
-            # последняя запись по (id) выигрывает в flats; последняя по (id,date) — в snapshots
+            # последняя запись по (id) выигрывает в flats; последняя по
+            # (id,date) — в snapshots. first_seen при этом — МИНИМУМ по
+            # архиву: назначение бэкфилла — ретро-история, и «первое
+            # появление = последний архивный день» противоречило бы ей.
+            prev = flats_by_pk.get((flat_row["id"],))
+            if prev is not None and prev["first_seen"] < flat_row["first_seen"]:
+                flat_row["first_seen"] = prev["first_seen"]
             flats_by_pk[(flat_row["id"],)] = flat_row
             snaps_by_pk[(snap_row["flat_id"], snap_row["scan_date"])] = snap_row
             unique_flat_ids.add(flat_row["id"])
 
         time.sleep(sleep_sec)
 
-    with sqlite3.connect(db_path) as conn:
+    # closing: контекст-менеджер sqlite3 коммитит, но НЕ закрывает; при
+    # --all-blocks --workers N незакрытые соединения копили WAL-shm хэндлы
+    with closing(sqlite3.connect(db_path)) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         # backfill часто запускают по нескольким ЖК параллельно — ждём
         # освобождения write-лока вместо мгновенного "database is locked".

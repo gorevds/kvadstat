@@ -3,10 +3,11 @@ import argparse
 import logging
 import sqlite3
 import sys
+from contextlib import closing
 from pathlib import Path
 
 from kvadstat.aggregated import import_file
-from kvadstat.store import apply_schema
+from kvadstat.store import apply_schema, refresh_materialized
 
 
 def main(argv=None):
@@ -19,10 +20,13 @@ def main(argv=None):
     args = p.parse_args(argv)
 
     args.db.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(args.db) as conn:
+    # closing: контекст-менеджер sqlite3 коммитит, но НЕ закрывает соединение
+    with closing(sqlite3.connect(args.db)) as conn:
         conn.execute("PRAGMA foreign_keys = ON")
         apply_schema(conn)
         n = import_file(conn, path=args.json, block_id=args.block_id)
+        conn.commit()
+        refresh_materialized(conn)
     print(f"OK: imported {n} aggregated records for block_id={args.block_id}")
     return 0
 

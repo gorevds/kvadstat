@@ -140,3 +140,37 @@ def test_apply_schema_migrates_old_db_adding_promo_columns(conn):
     apply_schema(conn)  # must add missing columns without error
     cols = {row[1] for row in conn.execute("PRAGMA table_info(snapshots)")}
     assert {"base_meter_price", "promo_price", "discount_pct", "has_promo"}.issubset(cols)
+
+
+def test_upsert_fills_snapshot_defaults():
+    """Снапшот без has_promo от внешнего вызывающего не должен падать на
+    NOT NULL — _SNAP_DEFAULTS применяется в upsert, как и _FLAT_DEFAULTS."""
+    import sqlite3 as _sq
+
+    from kvadstat.store import apply_schema as _apply
+    from kvadstat.store import upsert as _upsert
+    c = _sq.connect(":memory:")
+    _apply(c)
+    flat = {"id": 1, "guid": "g1", "block_id": 1165, "bulk_id": None,
+            "section_id": None, "layout_id": None, "bulk_name": None,
+            "section_no": None, "floor": 2, "rooms": "1", "rooms_fact": 1,
+            "is_studio": 0, "area": 40.0, "area_kitchen": None,
+            "area_living": None, "number": None, "name": None, "url": None,
+            "pdf_url": None, "plan_url": None, "ceiling_height": None,
+            "settlement_date": None, "first_seen": "2026-06-11"}
+    snap = {"flat_id": 1, "scan_date": "2026-06-11", "scan_ts": "t",
+            "status": "free", "price": 10_000_000, "meter_price": None,
+            "base_meter_price": None, "promo_price": None,
+            "discount_pct": None, "old_price": None, "discount": None,
+            "finish": None, "mortgage_min_rate": None,
+            "mortgage_best_name": None, "updated_at": None}
+    # has_promo сознательно НЕ передан
+    _upsert(c, flats=[flat], snapshots=[snap])
+    assert c.execute("SELECT has_promo FROM snapshots").fetchone()[0] == 0
+
+
+def test_wayback_date_converts_utc_to_msk():
+    """Снимок 22:30 UTC относится к СЛЕДУЮЩЕМУ дню МСК."""
+    from kvadstat.backfill_wayback import _wayback_date
+    assert _wayback_date("20250629223000") == "2025-06-30"
+    assert _wayback_date("20250629055318") == "2025-06-29"

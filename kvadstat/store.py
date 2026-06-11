@@ -59,11 +59,10 @@ def _migrate_blocks(conn: sqlite3.Connection) -> None:
     # извлекать город неоткуда, view упадёт в COALESCE → 'msk'.
     if "address" in existing:
         conn.execute(_CITY_BACKFILL_SQL)
-        # вторая фаза: не-PIK 'other' (FSK без префикса города) → 'msk'
-        if "developer" in existing or "developer" in {
-            row[1] for row in conn.execute("PRAGMA table_info(blocks)")
-        }:
-            conn.execute(_CITY_NON_PIK_OTHER_FIX_SQL)
+        # вторая фаза: не-PIK 'other' (FSK без префикса города) → 'msk'.
+        # Колонка developer гарантированно есть (добавлена выше), UPDATE
+        # идемпотентен — никаких условий не нужно.
+        conn.execute(_CITY_NON_PIK_OTHER_FIX_SQL)
 
 
 # Зеркало kvadstat.geo._CITY_PATTERNS / city_from_address. Держим в SQL чтобы не
@@ -328,10 +327,13 @@ def _ensure_view_or_drop_table(conn: sqlite3.Connection, name: str) -> None:
 def _create_views(conn: sqlite3.Connection) -> None:
     """Создаёт today_all / today_one_room / flat_sparkline_30d как VIEW.
 
-    Вызывается из apply_schema на каждом скане. refresh_materialized потом
-    переписывает их в TABLE (быстрее чтение), но во время скана и до его
-    завершения это VIEW — иначе между scan-стартом и scan-концом /kvadstat/today_all
-    отдавал бы 404 или stale-table.
+    Вызывается из apply_schema, а apply_schema — НЕ только сканом: merge,
+    backfill, import_aggregated тоже входят сюда. Существующую ТАБЛИЦУ
+    (материализованную refresh_materialized) поэтому НЕ сбрасываем во VIEW:
+    деградация дашборда с 50мс до 3-5с длилась бы до следующего ночного
+    скана. Таблица может стать слегка stale после merge/backfill — эти CLI
+    зовут refresh_materialized сами по завершении. VIEW пересоздаём (тело
+    sparkline содержит дату-отсечку), TABLE не трогаем.
     """
     cutoff = (datetime.now(_MSK) - timedelta(days=30)).strftime("%Y-%m-%d")
     for name, sql in [
@@ -339,7 +341,13 @@ def _create_views(conn: sqlite3.Connection) -> None:
         ("today_one_room", _TODAY_ONE_ROOM_SELECT),
         ("flat_sparkline_30d", _sparkline_select(cutoff)),
     ]:
-        _ensure_view_or_drop_table(conn, name)
+        row = conn.execute(
+            "SELECT type FROM sqlite_master WHERE name=?", (name,)
+        ).fetchone()
+        if row is not None and row[0] == "table":
+            continue  # материализованная витрина валиднее свежего VIEW
+        if row is not None and row[0] == "view":
+            conn.execute(f"DROP VIEW {name}")
         conn.execute(f"CREATE VIEW {name} AS {sql}")
 
 
@@ -560,6 +568,11 @@ def upsert(
     snap_rows = list(snapshots)
     for row in flat_rows:
         for k, v in _FLAT_DEFAULTS.items():
+            row.setdefault(k, v)
+    # симметрично flats: внешний вызывающий со старым dict без has_promo
+    # иначе ловил бы ProgrammingError на NOT NULL колонке
+    for row in snap_rows:
+        for k, v in _SNAP_DEFAULTS.items():
             row.setdefault(k, v)
     cur = conn.cursor()
     if manage_transaction:

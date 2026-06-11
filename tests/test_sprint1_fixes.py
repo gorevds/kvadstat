@@ -289,3 +289,31 @@ def test_merge_carries_blocks_so_flats_are_not_orphan(tmp_path):
     c = sqlite3.connect(main)
     name = c.execute("SELECT name FROM blocks WHERE id=500").fetchone()
     assert name == ("Legacy ЖК",)
+
+
+def test_merge_handles_legacy_db_without_slug(tmp_path):
+    """БД совсем старой схемы (blocks без slug) не валит merge —
+    модуль обещает толерантность к легаси-схемам целиком."""
+    src = tmp_path / "noslug.db"
+    main = tmp_path / "main.db"
+    c = sqlite3.connect(src)
+    c.executescript("""
+        CREATE TABLE blocks (id INTEGER PRIMARY KEY, name TEXT, updated_at TEXT);
+        CREATE TABLE flats (
+            id INTEGER PRIMARY KEY, guid TEXT, block_id INTEGER,
+            first_seen TEXT
+        );
+        CREATE TABLE snapshots (
+            flat_id INTEGER, scan_date TEXT, scan_ts TEXT, status TEXT,
+            price INTEGER, PRIMARY KEY (flat_id, scan_date)
+        );
+    """)
+    c.execute("INSERT INTO blocks (id, name, updated_at) VALUES (600, 'Без slug', 't')")
+    c.execute("INSERT INTO flats VALUES (888, 'g8', 600, '2026-05-01')")
+    c.execute("INSERT INTO snapshots VALUES (888, '2026-05-01', 't', 'free', 6000000)")
+    c.commit()
+    c.close()
+    summary = merge_databases(main_path=main, source_paths=[src])
+    assert summary[str(src)]["flats_in_source"] == 1
+    m = sqlite3.connect(main)
+    assert m.execute("SELECT slug FROM blocks WHERE id=600").fetchone()[0] is None

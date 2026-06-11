@@ -20,6 +20,7 @@ import sys
 import time
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import closing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -60,7 +61,8 @@ def _pik_collect_for_known_blocks(db_path: Path) -> CollectResult:
     if not db_path.exists():
         log.warning("ПИК: БД %s не существует, нечего сканировать", db_path)
         return CollectResult(blocks=[], flats=[])
-    with sqlite3.connect(db_path) as conn:
+    # closing: КМ sqlite3 не закрывает соединение (см. R4 в run_developer)
+    with closing(sqlite3.connect(db_path)) as conn:
         rows = conn.execute(
             "SELECT id FROM blocks WHERE developer='ПИК' AND id < ? ORDER BY id",
             (ID_NAMESPACE,),

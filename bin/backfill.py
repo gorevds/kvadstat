@@ -11,6 +11,7 @@ import os
 import sqlite3
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from contextlib import closing
 from pathlib import Path
 
 from kvadstat.backfill_wayback import backfill
@@ -20,7 +21,8 @@ def _blocks_with_slug(db_path: Path) -> list[tuple[int, str]]:
     """(block_id, slug) для всех ЖК с непустым slug — источник для --all-blocks."""
     if not db_path.exists():
         return []
-    with sqlite3.connect(db_path) as conn:
+    # closing: контекст-менеджер sqlite3 НЕ закрывает соединение
+    with closing(sqlite3.connect(db_path)) as conn:
         rows = conn.execute(
             "SELECT id, slug FROM blocks "
             "WHERE slug IS NOT NULL AND TRIM(slug) != '' ORDER BY id"

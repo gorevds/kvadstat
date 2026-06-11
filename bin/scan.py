@@ -46,7 +46,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--all-blocks", action="store_true",
                         help="Игнорируется: PIK всегда сканирует все известные блоки.")
-    parser.add_argument("--workers", type=int, default=6)
+    parser.add_argument("--workers", type=int, default=6,
+                        help="DEPRECATED: для одного застройщика шим "
+                             "схлопывает пул до 1, значение игнорируется")
     args = parser.parse_args(argv)
 
     return scan_dev.main([

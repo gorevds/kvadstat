@@ -124,7 +124,10 @@ def _to_norm(fl: dict) -> NormFlat:
         settlement_date=_settlement(fl),
         url=(_SITE + url) if url else None,
         finish=fl.get("renovation"),
-        number=fl.get("section_title"),
+        # У API нет явного номера квартиры в листинге; раньше сюда писался
+        # section_title (номер СЕКЦИИ) — в UI это выглядело как «№ кв.».
+        # Лучше честный NULL, чем чужое значение.
+        number=fl.get("number"),
         plan_url=fl.get("plan") or fl.get("floor_plan"),
         is_apartment=(fl.get("type_of_living_realty") == "apartment"),
     )

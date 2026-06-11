@@ -73,7 +73,7 @@ def _to_norm(fl: dict) -> NormFlat:
     # current_price — final (со скидкой если есть); price — base. Берём final.
     current = fl.get("current_price")
     base = fl.get("price")
-    # API отдаёт price как float/Decimal-как-строку — нормализуем в int копеек→рублей
+    # API отдаёт price как float/Decimal-как-строку — API отдаёт рубли дробью — округляем до int рублей
     def _money(v):
         if v is None: return None
         try: return int(round(float(v)))

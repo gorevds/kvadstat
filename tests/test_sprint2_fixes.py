@@ -78,9 +78,10 @@ def test_refresh_is_idempotent_when_already_materialized():
     assert _types_for(c, "today_all") == "table"
 
 
-def test_apply_schema_after_refresh_recreates_views():
-    """apply_schema на БД с уже материализованными table должен дропнуть
-    table и вернуть view (важно для start-of-scan сценария)."""
+def test_apply_schema_preserves_materialized_table():
+    """apply_schema на БД с материализованной table НЕ деградирует её во
+    view: apply_schema зовут и merge/backfill/import — сброс во VIEW ронял
+    дашборд с 50мс на 3-5с до следующего ночного refresh."""
     c = sqlite3.connect(":memory:")
     apply_schema(c)
     upsert(c, flats=[SAMPLE_F], snapshots=[SAMPLE_S])
@@ -88,7 +89,8 @@ def test_apply_schema_after_refresh_recreates_views():
     assert _types_for(c, "today_all") == "table"
 
     apply_schema(c)
-    assert _types_for(c, "today_all") == "view"
+    assert _types_for(c, "today_all") == "table"
+    assert c.execute("SELECT COUNT(*) FROM today_all").fetchone()[0] == 1
 
 
 def test_refresh_handles_today_one_room_dependency():

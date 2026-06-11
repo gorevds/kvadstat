@@ -179,7 +179,9 @@ def extract_block_meta(data: dict, *, slug: str | None = None) -> dict:
     в самом flat).
     """
     block = data.get("block") or {}
-    flat = data.get("flats", [{}])[0] if isinstance(data.get("flats"), list) else data
+    flats_list = data.get("flats")
+    # `or [{}]`: пустой список (распроданный блок) иначе дал бы IndexError
+    flat = (flats_list or [{}])[0] if isinstance(flats_list, list) else data
     bulk = (
         block.get("bulk")
         or flat.get("bulk")
