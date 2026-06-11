@@ -143,36 +143,19 @@
 
 <footer id="footer"></footer>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"
+        integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<script src="/common.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 const flatId = params.get("id");
 
-function fmt(v) {
-  if (v === null || v === undefined) return "—";
-  return Number(v).toLocaleString("ru-RU") + " ₽";
-}
-
-// XSS-escape для текста, попадающего в .innerHTML
-function esc(s) {
-  if (s === null || s === undefined) return "";
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-// Разрешаем только http(s) ссылки для внешнего перехода — фильтр от
-// javascript:/data: URL'ов, которые мог отдать сорсер с битым полем url.
-function safeHref(u) {
-  if (!u) return "";
-  try {
-    const url = new URL(u, location.origin);
-    return (url.protocol === "https:" || url.protocol === "http:") ? url.href : "";
-  } catch { return ""; }
-}
+// fmt/esc/safeHref — общие с index.html (static/common.js). safeHref
+// раньше принимал и относительные URL — теперь, как и index, только
+// абсолютные http(s): одно поле — один фильтр.
+const fmt = KV.fmtRub;
+const esc = KV.escapeHtml;
+const safeHref = KV.safeUrl;
 
 async function loadJson(url) {
   const r = await fetch(url);

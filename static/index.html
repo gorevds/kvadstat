@@ -55,8 +55,10 @@
   ]
 }
 </script>
-<link href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/css/tabulator_modern.min.css" rel="stylesheet">
-<link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/css/tabulator_modern.min.css" rel="stylesheet"
+      integrity="sha384-H3VlC59cHClN7BLdfeW7eGYKUr1Tplpc4jIxg8NwijyO25+RaxVMUoyLseMP2Vi6" crossorigin="anonymous">
+<link href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css" rel="stylesheet"
+      integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous">
 <style>
   :root {
     --bg: #f6f7f9;
@@ -562,7 +564,7 @@
     font-size: 14px; font-weight: 600;
   }
   .home-cta button.primary { background: var(--accent); color: #fff; }
-  .home-cta button.ghost { background: var(--card); border: 1px solid var(--border); color: var(--text); }
+  .home-cta button.ghost { background: var(--card); border: 1px solid var(--border); color: var(--fg); }
   .home-how { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap: 16px; margin-top: 10px; }
   .home-how .card-how { background: var(--card); border: 1px solid var(--border);
@@ -848,8 +850,14 @@
 
 <footer id="footer"></footer>
 
-<script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/js/tabulator.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- SRI: компрометация CDN без integrity = полный XSS в обход всего
+     нашего экранирования; версии запинены, хеши пересчитывать при апгрейде
+     (curl URL | openssl dgst -sha384 -binary | base64) -->
+<script src="https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/js/tabulator.min.js"
+        integrity="sha384-SKSq3cuuVWdfrjtLz9wNlqE0bMc903yMS5zGnFtwvfddplgxa1hywtiLyw1CbSHO" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+<script src="/common.js"></script>
 <script>
 // Datasette режет ответ на max_returned_rows (см. deploy/kvadstat.service). В
 // _shape=array нет флага усечения, поэтому держим лимит и на клиенте, и в
@@ -892,9 +900,6 @@ const fmtBaseWithStrike = (cell) => {
     return `<span class="struck">${text}</span>`;
   }
   return text;
-};
-const fmtPromoBadge = (cell) => {
-  return cell.getValue() === 1 ? `<span class="promo-badge">скидка</span>` : "";
 };
 const fmtLink = (cell) => {
   const href = safeUrl(cell.getValue());   // только http(s); js:/data: → ""
@@ -1014,7 +1019,7 @@ const columns = [
                                   "Level", "ГК ФСК", "MR Group", "Гранель",
                                   "Инград", "Брусника"]}},
   {title: "Город", field: "город", width: 88, headerFilter: "input",
-   formatter: (c) => cityLabel(c.getValue())},
+   formatter: (c) => escapeHtml(cityLabel(c.getValue()))},
   {title: "ЖК", field: "жк", width: 132, headerFilter: "input"},
   {title: "Класс", field: "класс", width: 92, hozAlign: "center", headerHozAlign: "center",
    headerFilter: "list",
@@ -1056,7 +1061,7 @@ const columns = [
      const f = c.getValue();
      const total = r["этажей_всего"];
      if (f == null) return "";
-     return total ? `${f} / ${total}` : String(f);
+     return escapeHtml(total ? `${f} / ${total}` : String(f));
    }},
   {title: "Площадь, м²", field: "площадь_м²", width: 96, hozAlign: "right", headerHozAlign: "right",
    sorter: "number",
@@ -1094,7 +1099,9 @@ const columns = [
    headerFilter: "list", headerFilterParams: {valuesLookup: "all", sortValuesList: "asc"}},
   {title: "Заселение", field: "заселение", width: 90, hozAlign: "center", headerHozAlign: "center",
    sorter: (a, b) => fmtSettleSort(a) - fmtSettleSort(b),
-   formatter: (c) => fmtSettle(c.getValue())},
+   // «заселение» приходит сырым от 10 внешних API; fallback fmtSettle
+   // возвращает срез сырой строки — экранируем (formatter = innerHTML)
+   formatter: (c) => escapeHtml(fmtSettle(c.getValue()))},
   {title: "Статус", field: "статус", width: 84, hozAlign: "center", headerHozAlign: "center",
    headerFilter: "list", headerFilterParams: {valuesLookup: "all", sortValuesList: "asc"}},
   {title: "30 дн", field: "id", hozAlign: "center", headerHozAlign: "center",
@@ -1486,11 +1493,11 @@ function rentTooltip(r) {
   return (
     `Оценка аренды ${rent.toLocaleString("ru-RU")} ₽/мес.\n\n` +
     `База: ${f.base} ₽/м² × ${f.area.toFixed(1)} м²\n` +
-    `× город (${cityLabel(r["город"]) || "?"}): ×${f.city.toFixed(2)}\n` +
+    `× город (${escapeHtml(cityLabel(r["город"])) || "?"}): ×${f.city.toFixed(2)}\n` +
     `× дистанция (${r["км_от_центра"] != null ? r["км_от_центра"].toFixed(1) + " км" : "?"}): ×${f.dist.toFixed(2)}\n` +
     `× метро (${r["мин_пешком"] != null ? r["мин_пешком"] + " мин" : "?"}): ×${f.metro.toFixed(2)}\n` +
     `× этаж: ×${f.floor.toFixed(2)}\n` +
-    `× застройщик (${r["застройщик"]}): ×${f.dev.toFixed(2)}\n` +
+    `× застройщик (${escapeHtml(r["застройщик"])}): ×${f.dev.toFixed(2)}\n` +
     apartLine +
     `\nЧистыми (vacancy 12% + opex 5% + УСН 6% от gross): ${(net/1e6).toFixed(2)}М ₽/год\n` +
     `Доходность net от базовой цены: ${yieldNet}%`
@@ -1614,13 +1621,9 @@ function trapFocusInDetail(e) {
   }
 }
 
-// Только https/http — блокирует javascript:/data: атаки в href/src,
-// если когда-нибудь сторонний парсер засунет такое в ссылку/план.
-function safeUrl(s) {
-  if (s == null) return "";
-  const u = String(s).trim();
-  return /^https?:\/\//i.test(u) ? u : "";
-}
+// Только https/http — блокирует javascript:/data: атаки в href/src.
+// Реализация общая с flat.html (static/common.js).
+const safeUrl = KV.safeUrl;
 
 function renderDetail(r) {
   const fmtRub = (n) => n == null ? "—" : Number(n).toLocaleString("ru-RU") + " ₽";
@@ -1713,11 +1716,8 @@ function renderDetail(r) {
   `;
 }
 
-// Простейшие escape-helper'ы (внутри HTML и в значениях атрибутов).
-function escapeHtml(s) {
-  return String(s == null ? "" : s).replace(/[&<>"']/g, c =>
-    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
+// Escape/URL-санитайзеры — общие с flat.html (static/common.js).
+const escapeHtml = KV.escapeHtml;
 function escapeAttr(s) { return escapeHtml(s); }
 
 // История цены — последние 90 дней. Request token защищает от stale-ответа
@@ -2096,7 +2096,7 @@ function renderCardList(rows) {
           `<div>${E(r["комнат"])} · <b>${r["площадь_м²"] != null ? Number(r["площадь_м²"]).toFixed(1) + " м²" : "—"}</b></div>` +
           `<div>${floor}</div>` +
           `<div>🚇 <b>${metro}</b></div>` +
-          `<div>${settle}</div>` +
+          `<div>${E(settle)}</div>` +
           `<div>📐 ${E(r["отделка"] || "—")}</div>` +
           `<div>${rent != null ? "~" + Math.round(rent/1000) + "к/мес" : ""}</div>` +
         `</div>` +
@@ -2218,7 +2218,7 @@ function renderStats(rows) {
   // строк с null-ценой (старые архивные снапшоты или вышедшие из продажи
   // лоты). Раньше выводили «0 – 0 ₽» и NaN в average; теперь честно «—».
   if (prices.length === 0) {
-    const date0 = rows[0]["дата_среза"] || "—";
+    const date0 = escapeHtml(rows[0]["дата_среза"] || "—");
     return `
       <span><b>${new Set(rows.map(r => r["жк"])).size}</b> ЖК</span>
       <span><b>${rows.length}</b> квартир</span>
@@ -2229,7 +2229,7 @@ function renderStats(rows) {
   }
   const min = arrayMin(prices), max = arrayMax(prices);
   const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
-  const date = rows[0]["дата_среза"] || "—";
+  const date = escapeHtml(rows[0]["дата_среза"] || "—");
   const zkCount = new Set(rows.map(r => r["жк"])).size;
   return `
     <span><b>${zkCount}</b> ЖК</span>
@@ -2694,7 +2694,7 @@ function zhkCardHtml(z) {
     : "";
   return `<div class="zhk-card" data-zhk-id="${z.id}">
     <div class="zk-name">${escapeHtml(z.name)}</div>
-    <div class="zk-sub">${escapeHtml(z.dev || "")}${klassChip} · ${cityLabel(z.city)}${metroTxt}</div>
+    <div class="zk-sub">${escapeHtml(z.dev || "")}${klassChip} · ${escapeHtml(cityLabel(z.city))}${metroTxt}</div>
     <div class="zk-price">от ${fmtRub(z.minPrice)} <small>· ${z.medMeter ? Math.round(z.medMeter).toLocaleString("ru-RU") + " ₽/м²" : "—"}</small></div>
     <div class="zk-badges">${badges.join("")}</div>
     ${curve}
@@ -2753,7 +2753,7 @@ function openZhkDetail(id) {
   el.innerHTML = `<div class="inner">
     <button class="dclose" type="button" aria-label="Закрыть">✕</button>
     <h2>${escapeHtml(z.name)}</h2>
-    <div class="zk-sub" style="color:var(--muted);font-size:13px">${escapeHtml(z.dev || "")} · ${cityLabel(z.city)}${z.metro ? " · м. " + escapeHtml(z.metro) : ""}</div>
+    <div class="zk-sub" style="color:var(--muted);font-size:13px">${escapeHtml(z.dev || "")} · ${escapeHtml(cityLabel(z.city))}${z.metro ? " · м. " + escapeHtml(z.metro) : ""}</div>
     ${salesBlock}
     ${curve}
     ${conf}
