@@ -1,3 +1,8 @@
 User-agent: *
+# Datasette-таблицы (/kvadstat/...) — бесконечное пространство URL
+# (_next/_sort/_facet), каждый хит = реальный SQL по 480k строк. SEO-ценности
+# ноль (сырой JSON/HTML таблиц), краулерам туда нельзя.
+Disallow: /kvadstat/
 Allow: /
+
 Sitemap: https://kvadstat.gorev.space/sitemap.xml

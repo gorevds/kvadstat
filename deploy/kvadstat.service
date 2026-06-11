@@ -14,7 +14,16 @@ ExecStart=/opt/kvadstat/venv/bin/datasette serve /opt/kvadstat/data/kvadstat.db 
   --setting truncate_cells_html 0 \
   --setting max_returned_rows 80000 \
   --setting sql_time_limit_ms 10000 \
-  --setting default_allow_sql off
+  --setting default_allow_sql off \
+  --setting allow_download off \
+  --setting allow_csv_stream off \
+  --setting max_csv_mb 5
+# allow_download off — /kvadstat.db (вся БД одним файлом) не должен быть
+# доступен анонимно; сейчас его прикрывал только regex nginx-локации
+# (защита совпадением). allow_csv_stream off + max_csv_mb 5 — стриминг
+# snapshots.csv?_stream=on отдавал 480k строк одним запросом мимо
+# смысла rate-limit'а. SPA экспортирует CSV на клиенте (Tabulator),
+# серверный CSV ей не нужен.
 # default_allow_sql off — публичный /api/ запрещает /_sql и custom SQL
 # в URL'ах через ?sql=. До этого arbitrary SQL execution был анонимным
 # (DoS через рекурсивные CTE; чтение любой таблицы). Витрина работает
