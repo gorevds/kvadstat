@@ -1002,7 +1002,12 @@ const shortId = (id) => {
 
 const columns = [
   {title: "ID", field: "id", width: 72, hozAlign: "right", headerHozAlign: "right",
-   headerFilter: "input", formatter: (c) => shortId(c.getValue())},
+   headerFilter: "input",
+   // фильтр матчит ОТОБРАЖАЕМЫЙ id (shortId), не сырой — иначе копипаста
+   // видимого значения в фильтр ничего не находила
+   headerFilterFunc: (term, value) =>
+     String(shortId(value)).includes(String(term).trim()),
+   formatter: (c) => shortId(c.getValue())},
   {title: "Застройщик", field: "застройщик", width: 104, hozAlign: "center", headerHozAlign: "center",
    headerFilter: "list", formatter: fmtDeveloper,
    headerFilterParams: {values: ["", "ПИК", "А101", "Донстрой", "Абсолют",
@@ -1186,16 +1191,28 @@ function settlementYear(s) {
   const m = String(s).match(/(20\d{2})/);
   return m ? parseInt(m[1], 10) : null;
 }
-const COLS_LS_KEY = "kvadstat:hidden_cols:v2";  // v2: дефолт прячет линию/секцию
+const COLS_LS_KEY = "kvadstat:hidden_cols:v3";  // v3: ключ = field__title
 // Колонки, скрытые по умолчанию на первом визите (нет записи в localStorage):
-// «линия» метро и «секция» редко нужны и загромождают таблицу. Пользователь
-// с уже сохранённым набором сохраняет свой выбор. ВАЖНО: ключи скрытия —
-// в формате `${field}__${idx}` (индекс по массиву `columns`, как в
-// buildColsPanel/applyColumnVisibility), а не просто имя поля — иначе
-// hiddenCols.has(key) никогда не совпадёт. линия=idx6, секция=idx10.
-const DEFAULT_HIDDEN_COLS = ["линия__6", "секция__10"];
-const _savedCols = localStorage.getItem(COLS_LS_KEY);
-const hiddenCols = new Set(_savedCols ? JSON.parse(_savedCols) : DEFAULT_HIDDEN_COLS);
+// «линия» метро и «секция» редко нужны и загромождают таблицу. Ключ
+// скрытия — `${field}__${title}` (как в buildColsPanel/
+// applyColumnVisibility): title уникален и, в отличие от индекса по
+// массиву columns, не дрейфует при добавлении/удалении колонок (ровно
+// такой дрейф (линия__6 при реальном idx 7) делал v2-дефолты no-op'ом).
+const DEFAULT_HIDDEN_COLS = ["линия__Линия", "секция__Секция"];
+// localStorage может кинуть SecurityError (блокировка site-data), битое
+// значение — SyntaxError; необработанные на top-level они убили бы весь
+// <script> (вечная «загрузка…»). Любая проблема → дефолты.
+let _savedCols = null;
+try {
+  const _rawCols = localStorage.getItem(COLS_LS_KEY);
+  const _parsedCols = _rawCols ? JSON.parse(_rawCols) : null;
+  if (Array.isArray(_parsedCols)) _savedCols = _parsedCols;
+} catch (e) { /* приватный режим / битое значение — дефолты */ }
+const hiddenCols = new Set(_savedCols || DEFAULT_HIDDEN_COLS);
+function persistCols() {
+  try { localStorage.setItem(COLS_LS_KEY, JSON.stringify([...hiddenCols])); }
+  catch (e) { /* квота/блокировка — настройка не переживёт reload, не фатально */ }
+}
 
 // ─── Сохранённые поиски (localStorage) ───────────────────────
 // Хранит снапшоты состояния фильтров под понятным именем. Сохраняем
@@ -1280,7 +1297,15 @@ function applySnapshot(s) {
   // Прокатываем по DOM
   for (const [id, val] of [["devFilter", currentDev], ["cityFilter", currentCity]]) {
     const el = document.getElementById(id);
-    if (el) el.value = val;
+    if (!el) continue;
+    // option мог исчезнуть (сохранёнка ссылается на выведенного
+    // застройщика) — иначе select остался бы визуально пустым, а фильтр
+    // молча отдавал 0 строк
+    const ok = val === "all" || [...el.options].some(o => o.value === val);
+    if (!ok) {
+      if (id === "devFilter") currentDev = "all"; else currentCity = "all";
+    }
+    el.value = ok ? val : "all";
   }
   // zk-dropdown пересоберётся rebuildZkDropdown'ом, но он берёт prevValue
   // из sel.value — поэтому сначала кладём option на лету, чтобы DOM-state
@@ -1347,9 +1372,11 @@ function renderSavedPanel() {
     del.style.cssText = "border:none;background:transparent;cursor:pointer";
     del.addEventListener("click", (e) => {
       e.stopPropagation();
+      // по имени, не по индексу: индекс захватывается при рендере и устаревает,
+      // если другая вкладка изменила список
       const list = readSaved();
-      list.splice(idx, 1);
-      writeSaved(list);
+      const i = list.findIndex(x => x.name === item.name);
+      if (i !== -1) { list.splice(i, 1); writeSaved(list); }
       renderSavedPanel();
     });
     row.appendChild(labelBtn); row.appendChild(del);
@@ -1503,7 +1530,8 @@ async function loadSparklines() {
   try {
     // Лимит общий с today_all (ROW_LIMIT) и с max_returned_rows в юните.
     // В _shape=array Datasette не возвращает флаг усечения — проверяем сами.
-    const resp = await fetch(`/kvadstat/flat_sparkline_30d.json?_shape=array&_size=${ROW_LIMIT}`);
+    const resp = await fetch(`/kvadstat/flat_sparkline_30d.json?_shape=array&_size=${ROW_LIMIT}`,
+                             { signal: AbortSignal.timeout(20000) });
     if (!resp.ok) { console.warn("sparklines: HTTP", resp.status); return; }
     const rows = await resp.json();
     if (rows.length >= ROW_LIMIT) {
@@ -1540,8 +1568,10 @@ function openDetail(row, trigger) {
   const panel = document.getElementById("detailPanel");
   const overlay = document.getElementById("detailOverlay");
   detailReturnFocus = trigger || document.activeElement;
+  const areaTitle = row["площадь_м²"] != null
+    ? `${Number(row["площадь_м²"]).toFixed(1)} м²` : "— м²";
   document.getElementById("detailTitle").textContent =
-    `${row["жк"]} · ${row["комнат"]} · ${Number(row["площадь_м²"]).toFixed(1)} м²`;
+    `${row["жк"]} · ${row["комнат"]} · ${areaTitle}`;
   document.getElementById("detailBody").innerHTML = renderDetail(row);
   panel.classList.add("open"); overlay.classList.add("open");
   panel.setAttribute("aria-hidden", "false");
@@ -1946,11 +1976,14 @@ document.addEventListener("click", (e) => {
 
 // Вычисляет отфильтрованный набор; не трогает UI. Используется и таблицей,
 // и картой (карта тоже должна реагировать на фильтры).
-function filteredRows() {
+function filteredRows({ skipZk = false } = {}) {
   let rows = allRows;
   if (currentDev !== "all") rows = rows.filter(r => r["застройщик"] === currentDev);
   if (currentCity !== "all") rows = rows.filter(r => r["город"] === currentCity);
-  if (currentZk !== "all") rows = rows.filter(r => r["жк"] === currentZk);
+  // skipZk: пул для ЖК-дропдауна считается БЕЗ zk-фильтра, иначе после
+  // выбора ЖК в списке оставался бы только он сам (нельзя переключиться
+  // на другой ЖК напрямую).
+  if (!skipZk && currentZk !== "all") rows = rows.filter(r => r["жк"] === currentZk);
   if (selectedRooms.size > 0) rows = rows.filter(r => roomMatches(r["комнат"]));
   if (selectedClasses.size > 0) rows = rows.filter(r => classMatches(r["класс"]));
   if (promoOnly) rows = rows.filter(r => r["промо"] === 1);
@@ -2019,7 +2052,7 @@ function applyFilter() {
     renderMapMarkers(rows);
   }
   document.getElementById("stats").innerHTML = renderStats(rows);
-  rebuildZkDropdown(rows);
+  rebuildZkDropdown(filteredRows({ skipZk: true }));
 }
 
 // Минималистичная карточка для мобильного. Показываем только то, что
@@ -2060,7 +2093,7 @@ function renderCardList(rows) {
         `</div>` +
         `<div class="card-price">${priceTxt}</div>` +
         `<div class="card-meta">` +
-          `<div>${E(r["комнат"])} · <b>${Number(r["площадь_м²"]).toFixed(1)} м²</b></div>` +
+          `<div>${E(r["комнат"])} · <b>${r["площадь_м²"] != null ? Number(r["площадь_м²"]).toFixed(1) + " м²" : "—"}</b></div>` +
           `<div>${floor}</div>` +
           `<div>🚇 <b>${metro}</b></div>` +
           `<div>${settle}</div>` +
@@ -2084,8 +2117,8 @@ function buildColsPanel() {
     const field = col.field;
     const title = col.title || field;
     if (!field) return;
-    // дубликат поля (id используется в "ID" и в "График") — отличаем по индексу
-    const key = `${field}__${idx}`;
+    // дубликат поля (id используется в "ID" и в "График") — отличаем по title
+    const key = `${field}__${title}`;
     if (seen.has(key)) return;
     seen.add(key);
     const wrap = document.createElement("label");
@@ -2095,7 +2128,7 @@ function buildColsPanel() {
     cb.addEventListener("change", () => {
       if (cb.checked) hiddenCols.delete(key);
       else hiddenCols.add(key);
-      localStorage.setItem(COLS_LS_KEY, JSON.stringify([...hiddenCols]));
+      persistCols();
       applyColumnVisibility();
     });
     wrap.appendChild(cb);
@@ -2112,7 +2145,7 @@ function buildColsPanel() {
   showAll.type = "button"; showAll.textContent = "Показать все";
   showAll.addEventListener("click", () => {
     hiddenCols.clear();
-    localStorage.setItem(COLS_LS_KEY, "[]");
+    persistCols();
     panel.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
     applyColumnVisibility();
   });
@@ -2126,7 +2159,7 @@ function applyColumnVisibility() {
   columns.forEach((col, idx) => {
     const field = col.field;
     if (!field) return;
-    const key = `${field}__${idx}`;
+    const key = `${field}__${col.title || field}`;
     if (seen.has(key)) return;
     seen.add(key);
     const tcols = table.getColumns();
@@ -2177,7 +2210,10 @@ function arrayMax(arr) {
 function renderStats(rows) {
   if (!rows.length) return "<span>0 квартир</span>";
   const promo = rows.filter(r => r["промо"] === 1).length;
-  const prices = rows.map(r => r["базовая_цена"]).filter(Boolean);
+  // Та же семантика, что у фильтра цены (flatPrice в filteredRows):
+  // «что реально заплатишь» — иначе фильтр «до 10 млн» показывал бы
+  // в статистике max выше 10 млн.
+  const prices = rows.map(r => r["цена_по_программе"] || r["базовая_цена"]).filter(Boolean);
   // prices.length === 0 при rows.length > 0 — реальный случай: набор
   // строк с null-ценой (старые архивные снапшоты или вышедшие из продажи
   // лоты). Раньше выводили «0 – 0 ₽» и NaN в average; теперь честно «—».
@@ -2206,7 +2242,10 @@ function renderStats(rows) {
 }
 
 async function load() {
-  const resp = await fetch(`/kvadstat/today_all.json?_shape=array&_size=${ROW_LIMIT}`);
+  // AbortSignal.timeout: зависший ответ (сервер допускает 10с SQL) без
+  // таймаута оставлял бы вечную «загрузку…» без какого-либо сигнала
+  const resp = await fetch(`/kvadstat/today_all.json?_shape=array&_size=${ROW_LIMIT}`,
+                           { signal: AbortSignal.timeout(20000) });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const rows = await resp.json();
   allRows = rows;
@@ -2838,9 +2877,30 @@ function applyHash() {
 }
 window.addEventListener("hashchange", applyHash);
 
+function showLoadError(e) {
+  // #grid живёт в скрытой вкладке — ошибку обязан увидеть и пользователь
+  // на главной: баннер сверху + явный текст в hero-статистике.
+  const banner = document.getElementById("trunc-banner");
+  if (banner) {
+    banner.textContent = `Не удалось загрузить данные: ${e && e.message ? e.message : e} `;
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Повторить";
+    retry.addEventListener("click", () => {
+      banner.style.display = "none";
+      load().catch(showLoadError);
+    });
+    banner.appendChild(retry);
+    banner.style.display = "block";
+  }
+  const hs = document.getElementById("homeStats");
+  if (hs) hs.textContent = "Ошибка загрузки данных — попробуйте обновить страницу";
+  const grid = document.getElementById("grid");
+  if (grid) grid.textContent = `Ошибка загрузки: ${e && e.message ? e.message : e}`;
+}
+
 load().catch((e) => {
-  document.getElementById("grid").innerHTML =
-    `<div style="padding:24px;color:#b91c1c">Ошибка загрузки: ${e}</div>`;
+  showLoadError(e);
 });
 </script>
 </body>
