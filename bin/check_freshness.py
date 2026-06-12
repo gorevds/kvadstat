@@ -31,9 +31,31 @@ MSK = timezone(timedelta(hours=3))
 ACTIVE_WINDOW_DAYS = 30
 
 
+def _active_developers() -> set[str] | None:
+    """Имена активно сканируемых застройщиков (реестр scan_dev.SOURCES).
+
+    Нужно, чтобы приостановленный источник (Level за Qrator, см. scan_dev)
+    не алертил ещё 30 дней своими старыми error-записями в scan_runs.
+    None — если реестр недоступен (тогда проверяем всех, fail-safe).
+    """
+    try:
+        from bin.scan_dev import SOURCES
+        return set(SOURCES)
+    except Exception:  # noqa: BLE001 — freshness не должен падать из-за импорта
+        return None
+
+
 def check_freshness(db_path: Path | str, *, max_age_days: int,
-                    today: str | None = None) -> list[str]:
-    """→ список человекочитаемых проблем (пусто = всё свежо)."""
+                    today: str | None = None,
+                    active: set[str] | None = None) -> list[str]:
+    """→ список человекочитаемых проблем (пусто = всё свежо).
+
+    Проверяются только активные застройщики (`active`; по умолчанию —
+    текущий scan_dev.SOURCES): снятый с обхода источник не считается
+    «протухшим».
+    """
+    if active is None:
+        active = _active_developers()
     today_d = (date.fromisoformat(today) if today
                else datetime.now(MSK).date())
     window_start = (today_d - timedelta(days=ACTIVE_WINDOW_DAYS)).isoformat()
@@ -64,6 +86,8 @@ def check_freshness(db_path: Path | str, *, max_age_days: int,
     conn = sqlite3.connect(db_path)
     try:
         for dev, last_any, last_data in sorted(rows):
+            if active is not None and dev not in active:
+                continue  # приостановленный источник не «протух»
             last_status = conn.execute(
                 "SELECT status FROM scan_runs WHERE developer=? "
                 "ORDER BY scan_date DESC, scan_ts DESC LIMIT 1",

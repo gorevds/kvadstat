@@ -39,7 +39,6 @@ from kvadstat.sources import (
     fsk,
     granel,
     ingrad,
-    level,
     mrgroup,
 )
 from kvadstat.sources import pik as pik_source
@@ -94,12 +93,15 @@ def _pik_placeholder() -> CollectResult:
 # Реестр источников: имя застройщика → функция обхода (без аргументов).
 # PIK обёрнут closure с db_path — main() рассинкронит placeholder до того,
 # как ThreadPoolExecutor подхватит SOURCES["ПИК"].
+# Level приостановлен 2026-06-12: level.ru ушёл за Qrator (hard-block по IP
+# сервера, проверено в т.ч. headless-браузером → HTTP 403). Модуль
+# kvadstat/sources/level.py оставлен на случай возврата открытого API;
+# агрегатная история ₽/м² Level доступна через mskmeter.
 SOURCES: dict[str, Callable[[], CollectResult]] = {
     pik_source.DEVELOPER: _pik_placeholder,
     fsk.DEVELOPER: fsk.collect,
     donstroy.DEVELOPER: donstroy.collect,
     a101.DEVELOPER: a101.collect,
-    level.DEVELOPER: level.collect,
     absolut.DEVELOPER: absolut.collect,
     mrgroup.DEVELOPER: mrgroup.collect,
     granel.DEVELOPER: granel.collect,

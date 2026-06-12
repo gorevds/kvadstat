@@ -162,3 +162,10 @@ def test_run_developer_mass_nullified_prices_is_partial(tmp_path, monkeypatch):
     assert n_flats == 9          # все лоты записаны (присутствие сохранено)
     assert status == "partial"
     assert "price=NULL" in msg
+
+
+def test_level_suspended_from_active_sources():
+    """Level снят с активного обхода (Qrator), но offset в реестре сохранён."""
+    from kvadstat.developers import DEVELOPERS
+    assert "Level" not in scan_dev.SOURCES
+    assert DEVELOPERS["Level"] == 6  # offset не трогаем — история валидна

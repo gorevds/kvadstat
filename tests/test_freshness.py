@@ -70,3 +70,22 @@ def test_empty_db_is_a_problem(tmp_path):
     db = _db(tmp_path)
     problems = check_freshness(db, max_age_days=2, today="2026-06-11")
     assert problems and "scan_runs" in problems[0]
+
+
+def test_suspended_developer_not_flagged(tmp_path):
+    """Снятый с обхода источник (нет в active) не алертит старыми error."""
+    db = _db(tmp_path)
+    _run(db, "ПИК", "2026-06-11")
+    _run(db, "Level", "2026-06-11", status="error")  # вчерашний error снятого
+    # active без Level — как после приостановки в scan_dev.SOURCES
+    problems = check_freshness(db, max_age_days=2, today="2026-06-11",
+                               active={"ПИК"})
+    assert problems == []
+
+
+def test_active_default_excludes_suspended_level(tmp_path):
+    """По умолчанию active = scan_dev.SOURCES, где Level больше нет."""
+    db = _db(tmp_path)
+    _run(db, "Level", "2026-06-11", status="error")
+    _run(db, "ПИК", "2026-06-11")
+    assert check_freshness(db, max_age_days=2, today="2026-06-11") == []
