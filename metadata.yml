@@ -44,3 +44,60 @@ databases:
           FROM snapshots
           WHERE flat_id = :flat_id
           ORDER BY scan_date
+      fav_flats:
+        title: Избранные квартиры — последний известный срез
+        description: >-
+          Для каждого id из :ids (JSON-массив) — последний снапшот в форме
+          today_all (русские колонки). Витрина «Избранное» так показывает
+          снятые с продажи лоты, которых уже нет в текущем срезе.
+        sql: |-
+          WITH want AS (SELECT value AS id FROM json_each(:ids)),
+          latest AS (
+              SELECT s.flat_id AS flat_id, MAX(s.scan_date) AS scan_date
+              FROM snapshots s JOIN want w ON w.id = s.flat_id
+              GROUP BY s.flat_id
+          )
+          SELECT
+              f.id                      AS id,
+              b.developer               AS застройщик,
+              COALESCE(b.name, 'block ' || f.block_id) AS жк,
+              COALESCE(b.city, 'msk')   AS город,
+              COALESCE(b.klass, 'н/д')  AS класс,
+              b.metro_name              AS метро,
+              CASE b.metro_line_type
+                  WHEN 1 THEN 'M' WHEN 2 THEN 'МЦК'
+                  WHEN 3 THEN 'МЦД' WHEN 4 THEN 'электр.' ELSE NULL
+              END                       AS тип_транспорта,
+              b.metro_time_foot         AS "мин_пешком",
+              b.metro_line_name         AS линия,
+              b.distance_km             AS "км_от_центра",
+              CASE f.rooms
+                  WHEN 'studio' THEN 'студия' WHEN '-1' THEN 'студия'
+                  ELSE f.rooms || 'к'
+              END                       AS комнат,
+              f.is_apartment            AS апартаменты,
+              f.bulk_name               AS корпус,
+              f.section_no              AS секция,
+              f.floor                   AS этаж,
+              f.area                    AS "площадь_м²",
+              COALESCE(s.old_price, s.price) AS базовая_цена,
+              s.promo_price             AS "цена_по_программе",
+              s.base_meter_price        AS "база_за_м²",
+              s.meter_price             AS "по_программе_за_м²",
+              s.has_promo               AS промо,
+              s.discount_pct            AS "скидка_%",
+              s.mortgage_best_name      AS программа,
+              s.status                  AS статус,
+              s.finish                  AS отделка,
+              f.settlement_date         AS заселение,
+              b.floors_max              AS "этажей_всего",
+              b.address                 AS адрес,
+              f.name                    AS артикул,
+              f.url                     AS ссылка,
+              f.plan_url                AS планировка,
+              s.scan_date               AS дата_среза,
+              f.block_id                AS block_id
+          FROM flats f
+          JOIN latest l ON l.flat_id = f.id
+          JOIN snapshots s ON s.flat_id = f.id AND s.scan_date = l.scan_date
+          LEFT JOIN blocks b ON b.id = f.block_id
