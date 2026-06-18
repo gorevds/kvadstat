@@ -147,6 +147,7 @@
   .tabulator-row.is-fav { box-shadow: inset 3px 0 0 0 #f0b429; }
   .tabulator-row.is-fav:not(.promo-row) { background: #fffbeb; }
   .tabulator-row.is-gone { opacity: .55; }
+  .fav-empty { padding: 48px 20px; text-align: center; color: var(--muted); font-size: 15px; }
   .promo-badge {
     display: inline-block;
     background: var(--promo);
@@ -684,6 +685,8 @@
             aria-selected="false" aria-controls="tab-zhk">🏙 ЖК</button>
     <button type="button" data-tab="objects" role="tab"
             aria-selected="false" aria-controls="tab-objects">📋 Все объекты</button>
+    <button type="button" data-tab="favorites" role="tab"
+            aria-selected="false" aria-controls="tab-favorites">⭐ Избранное <span id="favCount">0</span></button>
   </nav>
 
   <section id="tab-home" class="tab-panel active">
@@ -852,6 +855,15 @@
   <div id="grid"></div>
   <div id="cardList" aria-live="polite"></div>
   <div id="map"><div class="map-placeholder">загрузка карты…</div></div>
+  </section>
+
+  <section id="tab-favorites" class="tab-panel">
+    <div class="controls controls-sticky">
+      <span id="favSummary" style="color:var(--muted);font-size:13px"></span>
+      <label style="margin-left:auto"><input type="checkbox" id="favShowGone"> Показать снятые с продажи</label>
+    </div>
+    <div id="favEmpty" class="fav-empty" hidden>Пока ничего не добавлено. Откройте квартиру и нажмите ★ «В избранное».</div>
+    <div id="favGrid"></div>
   </section>
 </main>
 
@@ -1664,14 +1676,77 @@ function reformatFavRow() {
     try { const r = t.getRow(detailFlatId); if (r) r.reformat(); } catch (_) {}
   });
 }
-// Заглушка до создания вкладки (Task 5 переопределит поведение через
-// наличие #tab-favorites): если панели нет — ничего не делаем.
 function renderFavoritesTabIfActive() {
   const panel = document.getElementById("tab-favorites");
-  if (panel && panel.classList.contains("active") &&
-      typeof renderFavorites === "function") {
-    renderFavorites();
+  if (panel && panel.classList.contains("active")) renderFavorites();
+}
+
+// Рисуем вкладку «Избранное». Активные (есть в today_all) — из памяти, без
+// запроса. Снятые с продажи (нет в текущем срезе) тянутся по кнопке одним
+// запросом fav_flats и помечаются _gone (приглушаются + считаются в сводке).
+async function renderFavorites() {
+  const favIds = KV.fav.list();
+  const empty = document.getElementById("favEmpty");
+  const grid = document.getElementById("favGrid");
+  const summary = document.getElementById("favSummary");
+  if (!empty || !grid) return;
+  if (!favIds.length) {
+    if (favTable) favTable.replaceData([]);
+    empty.hidden = false;
+    grid.style.display = "none";
+    summary.textContent = "";
+    return;
   }
+  empty.hidden = true;
+  grid.style.display = "";
+
+  const favSet = new Set(favIds);
+  const active = allRows.filter((r) => favSet.has(Number(r.id)));
+  const activeIds = new Set(active.map((r) => Number(r.id)));
+  let rows = active.slice();
+  let goneErr = false;
+
+  const showGone = document.getElementById("favShowGone").checked;
+  const missing = favIds.filter((id) => !activeIds.has(id));
+  if (showGone && missing.length) {
+    try {
+      const url = `/kvadstat/fav_flats.json?ids=${encodeURIComponent(JSON.stringify(missing))}&_shape=array`;
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error("HTTP " + resp.status);
+      const gone = (await resp.json()).map((r) => Object.assign(r, { _gone: 1 }));
+      rows = rows.concat(gone);
+    } catch (_) {
+      goneErr = true;
+    }
+  }
+
+  if (!favTable) {
+    // Свежий клон колонок — Tabulator кладёт внутреннее состояние в объекты
+    // определений, делить их между инстансами нельзя.
+    favTable = new Tabulator("#favGrid", {
+      data: rows,
+      columns: columns.map((c) => ({ ...c })),
+      layout: "fitData",
+      height: "calc(100vh - 230px)",
+      rowFormatter,
+      initialSort: [{ column: "базовая_цена", dir: "asc" }],
+      pagination: false,
+      persistence: false,
+    });
+    favTable.on("rowClick", (e, row) => {
+      if (e.target && e.target.closest("a, button")) return;
+      if (window.getSelection && window.getSelection().toString().length) return;
+      openDetail(row.getData(), e.target && e.target.closest("tr") || e.target);
+    });
+  } else {
+    favTable.replaceData(rows);
+  }
+
+  const goneN = rows.filter((r) => r._gone).length;
+  summary.textContent =
+    `${rows.length} в избранном` +
+    (goneN ? ` · ${goneN} снято с продажи` : "") +
+    (goneErr ? " · не удалось загрузить снятые" : "");
 }
 
 // Минимальный focus trap внутри панели — Tab по кругу между focusable.
@@ -2549,6 +2624,9 @@ async function load() {
   // Любое изменение набора (в т.ч. из другой вкладки браузера) → синхрон UI.
   KV.fav.onChange(refreshFavUI);
   updateFavCount();
+  // Тумблер «Показать снятые с продажи» — перерисовать вкладку.
+  const favShowGone = document.getElementById("favShowGone");
+  if (favShowGone) favShowGone.addEventListener("change", renderFavorites);
   // Overlay click — закрываем ТОЛЬКО если mousedown тоже был на overlay
   // (drag-select копирования из панели не должен закрывать).
   const overlay = document.getElementById("detailOverlay");
@@ -2989,6 +3067,11 @@ function switchTab(tab) {
   }
   if (tab === "zhk") renderZhkList();
   if (tab === "home") renderHomeStats();
+  if (tab === "favorites") {
+    renderFavorites();
+    // Секция была display:none — Tabulator запомнил размер 0; пересчёт.
+    setTimeout(() => { if (favTable) favTable.redraw(true); }, 0);
+  }
 }
 
 function setupTabs() {
@@ -3001,7 +3084,7 @@ function setupTabs() {
 function applyHash() {
   const h = location.hash.slice(1);
   const [tab, arg] = h.split("=");
-  const t = ["home", "zhk", "objects"].includes(tab) ? tab : "home";
+  const t = ["home", "zhk", "objects", "favorites"].includes(tab) ? tab : "home";
   switchTab(t);
   const det = document.getElementById("zhkDetail");
   if (t === "zhk" && arg) openZhkDetail(+arg);
