@@ -142,6 +142,11 @@
     overflow: hidden;
   }
   .promo-row { background: var(--promo-bg) !important; }
+  /* Избранное — мягкая метка: золотая полоса слева (видна и поверх promo-фона)
+     + лёгкая подложка, когда строка не promo. Без яркой заливки. */
+  .tabulator-row.is-fav { box-shadow: inset 3px 0 0 0 #f0b429; }
+  .tabulator-row.is-fav:not(.promo-row) { background: #fffbeb; }
+  .tabulator-row.is-gone { opacity: .55; }
   .promo-badge {
     display: inline-block;
     background: var(--promo);
@@ -429,6 +434,15 @@
     color: var(--muted); font-size: 22px; padding: 0 6px; line-height: 1;
   }
   .detail-panel .detail-close:hover { color: var(--fg); }
+  .detail-panel .detail-fav {
+    align-self: center; border: 1px solid var(--border); background: #fff;
+    color: var(--accent); border-radius: 6px; padding: 4px 10px;
+    font-size: 13px; cursor: pointer; white-space: nowrap;
+  }
+  .detail-panel .detail-fav:hover { border-color: var(--accent); }
+  .detail-panel .detail-fav.on {
+    background: #fff7e6; border-color: #f0c674; color: #b7791f;
+  }
   .detail-panel main.detail-body {
     flex: 1; overflow-y: auto; padding: 16px 20px;
   }
@@ -846,6 +860,7 @@
 <aside id="detailPanel" class="detail-panel" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="detailTitle" tabindex="-1">
   <header class="detail-head">
     <h2 id="detailTitle">Квартира</h2>
+    <button class="detail-fav" id="detailFavBtn" type="button" aria-pressed="false">☆ В избранное</button>
     <button class="detail-close" type="button" aria-label="Закрыть">✕</button>
   </header>
   <main class="detail-body" id="detailBody">загрузка…</main>
@@ -994,9 +1009,11 @@ const fmtDeveloper = (cell) => {
 };
 
 const rowFormatter = (row) => {
-  if (row.getData()["промо"] === 1) {
-    row.getElement().classList.add("promo-row");
-  }
+  const d = row.getData();
+  const el = row.getElement();
+  if (d["промо"] === 1) el.classList.add("promo-row");
+  el.classList.toggle("is-fav", KV.fav.has(d.id));
+  if (d._gone) el.classList.add("is-gone");
 };
 
 // 4_000_000_153_513 → "40153513": offset (1 цифра) + native (с лидирующими
@@ -1137,6 +1154,9 @@ const columns = [
 
 let table;
 let allRows = [];
+// Избранное: id открытой в панели квартиры + отдельный Tabulator вкладки.
+let detailFlatId = null;
+let favTable = null;
 // Множественный выбор комнатности. Пустой набор = «все». Спец-ключ «4+»
 // матчит 4-комнатные и больше.
 let selectedRooms = new Set();
@@ -1587,6 +1607,8 @@ function openDetail(row, trigger) {
     ? `${Number(row["площадь_м²"]).toFixed(1)} м²` : "— м²";
   document.getElementById("detailTitle").textContent =
     `${row["жк"]} · ${row["комнат"]} · ${areaTitle}`;
+  detailFlatId = Number(row.id);
+  syncFavBtn();
   document.getElementById("detailBody").innerHTML = renderDetail(row);
   panel.classList.add("open"); overlay.classList.add("open");
   panel.setAttribute("aria-hidden", "false");
@@ -1610,6 +1632,46 @@ function closeDetail() {
     try { detailReturnFocus.focus(); } catch (_) {}
   }
   detailReturnFocus = null;
+}
+
+// ── Избранное ─────────────────────────────────────────────────────────
+// Единая точка синхронизации UI при любом изменении набора (локальный клик
+// или storage-событие из другой вкладки браузера).
+function refreshFavUI() {
+  syncFavBtn();
+  updateFavCount();
+  reformatFavRow();
+  renderFavoritesTabIfActive();
+}
+function syncFavBtn() {
+  const btn = document.getElementById("detailFavBtn");
+  if (!btn) return;
+  const on = detailFlatId != null && KV.fav.has(detailFlatId);
+  btn.classList.toggle("on", on);
+  btn.setAttribute("aria-pressed", on ? "true" : "false");
+  btn.textContent = on ? "★ В избранном" : "☆ В избранное";
+}
+function updateFavCount() {
+  const el = document.getElementById("favCount");
+  if (el) el.textContent = KV.fav.count();
+}
+// Переформатируем только что изменённую строку (detailFlatId) в обеих
+// таблицах — дешевле полного redraw. getRow по id (index по умолчанию).
+function reformatFavRow() {
+  if (detailFlatId == null) return;
+  [table, favTable].forEach((t) => {
+    if (!t) return;
+    try { const r = t.getRow(detailFlatId); if (r) r.reformat(); } catch (_) {}
+  });
+}
+// Заглушка до создания вкладки (Task 5 переопределит поведение через
+// наличие #tab-favorites): если панели нет — ничего не делаем.
+function renderFavoritesTabIfActive() {
+  const panel = document.getElementById("tab-favorites");
+  if (panel && panel.classList.contains("active") &&
+      typeof renderFavorites === "function") {
+    renderFavorites();
+  }
 }
 
 // Минимальный focus trap внутри панели — Tab по кругу между focusable.
@@ -2478,6 +2540,15 @@ async function load() {
   // Боковая панель деталей: закрытие
   document.querySelector("#detailPanel .detail-close")
     .addEventListener("click", closeDetail);
+  // Кнопка «в избранное» в шапке панели.
+  document.getElementById("detailFavBtn").addEventListener("click", () => {
+    if (detailFlatId == null) return;
+    KV.fav.toggle(detailFlatId);
+    refreshFavUI();
+  });
+  // Любое изменение набора (в т.ч. из другой вкладки браузера) → синхрон UI.
+  KV.fav.onChange(refreshFavUI);
+  updateFavCount();
   // Overlay click — закрываем ТОЛЬКО если mousedown тоже был на overlay
   // (drag-select копирования из панели не должен закрывать).
   const overlay = document.getElementById("detailOverlay");
