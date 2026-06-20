@@ -1114,9 +1114,11 @@ const columns = [
    formatter: fmtPct, width: 110},
   // (колонки «Программа» и бейджа скидки убраны — flag промо уже виден
   // через подсветку строки .promo-row + значение в «Скидка %».)
-  {title: "База ₽/м²", field: "база_за_м²", hozAlign: "right", headerHozAlign: "right",
+  // «₽/м²» = цена со скидкой за м² (база_за_м² = round(цена_по_программе/площадь),
+  // см. build_rows). Префикс «База» убран — значение уже итоговое, не списочное.
+  {title: "₽/м²", field: "база_за_м²", hozAlign: "right", headerHozAlign: "right",
    sorter: "number", sorterParams: {alignEmptyValues: "bottom"},
-   formatter: fmtMeter, width: 155},
+   formatter: fmtMeter, width: 120},
   // Оценочная арендная ставка по моей модели (см. rentMonthly).
   // field=id чтобы Tabulator пустил sorter; реально считаем на лету.
   {title: "Аренда/мес", field: "id", hozAlign: "right", headerHozAlign: "right",
@@ -1790,7 +1792,10 @@ function renderDetail(r) {
          ${discPct >= 0.5 ? `<span class="detail-discount-badge">−${discPct.toFixed(0)}%</span>` : ""}
        </div>`
     : `<div class="detail-price-row"><span>${E(fmtRub(base || program))}</span></div>`;
-  const ppm = r["база_за_м²"] || (base && r["площадь_м²"] ? Math.round(base/r["площадь_м²"]) : null);
+  // ₽/м² со скидкой: основное — база_за_м² (= итог/площадь); fallback от
+  // итоговой цены (program||base), не от списочной.
+  const ppmBase = program || base;
+  const ppm = r["база_за_м²"] || (ppmBase && r["площадь_м²"] ? Math.round(ppmBase/r["площадь_м²"]) : null);
   // metroTimeText сам подавит «0/null мин» — отдельная проверка не нужна,
   // но строку «N мин пешком» здесь хотим длиннее, чем helper («N мин»).
   const metroTime = metroTimeText(r);
