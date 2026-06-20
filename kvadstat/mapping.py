@@ -111,7 +111,7 @@ def _detect_promo(price, meter_price, area) -> tuple[int | None, int | None, flo
     """Возвращает (promo_price, base_meter_price, discount_pct, has_promo).
 
     promo_price       — итог с ипотечной программой = round(meter_price * area)
-    base_meter_price  — цена за м² при оплате налом   = round(price / area)
+    base_meter_price  — ₽/м² от ИТОГОВОЙ цены со скидкой = round(promo_price / area)
     discount_pct      — процент скидки (0..100), None если данных мало
     has_promo         — 1 если скидка ≥0.5%
 
@@ -123,7 +123,7 @@ def _detect_promo(price, meter_price, area) -> tuple[int | None, int | None, flo
     if not (price and meter_price and area) or area <= 0 or price <= 0:
         return None, None, None, 0
     promo_price = round(meter_price * area)
-    base_meter = round(price / area)
+    base_meter = round(promo_price / area)
     pct = (price - promo_price) / price * 100
     if pct < 0.5:
         return promo_price, base_meter, 0.0, 0

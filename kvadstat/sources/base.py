@@ -287,13 +287,6 @@ def build_rows(
         old_price = f.old_price if price_valid else None
         if meter_price is None and price and area and area > 0:
             meter_price = round(price / area)
-        # «база за м²» считаем от БАЗОВОЙ (списочной) цены = COALESCE(old_price,
-        # price) — ТОЧНО как столбец «базовая_цена» в витрине (store.py), иначе
-        # база_за_м² ≠ базовая_цена/площадь. Зеркалим COALESCE целиком (а не
-        # только old_price>price), чтобы инвариант держался и в редком случае
-        # old_price ≤ price (цена выросла выше прежней списочной).
-        base_price = old_price if old_price else price
-        base_meter = round(base_price / area) if base_price and area and area > 0 else None
         disc_abs, disc_pct, has_promo = _detect_discount(price, old_price)
         rooms = f.rooms
 
@@ -352,6 +345,13 @@ def build_rows(
                 disc_abs = 0
         else:
             promo_price = price  # default = «без программы»
+        # «₽/м²» (база_за_м²) считаем от ИТОГОВОЙ цены со скидкой = promo_price
+        # (программная для ПИК; после прямой скидки old→price для остальных).
+        # Не от списочной old_price — пользователь хочет видеть цену, которую
+        # реально платишь, за м². Инвариант: база_за_м² = round(цена_по_программе
+        # / площадь), как в колонке «С программой».
+        base_meter = (round(promo_price / area)
+                      if promo_price and area and area > 0 else None)
         snap_rows.append({
             "flat_id": gid,
             "scan_date": scan_date,

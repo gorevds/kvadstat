@@ -355,12 +355,14 @@ def refresh_block_classes(conn: sqlite3.Connection) -> None:
     """Проставляет blocks.klass для всех ЖК (см. kvadstat.klass).
 
     Класс — гибрид: курируемый маппинг + дефолт застройщика + авто по
-    медианной цене за м². Цену берём из последнего среза каждого блока
-    (base_meter_price); курируемым/дефолтным ЖК цена не нужна, поэтому блоки
-    без снапшотов всё равно классифицируются. Вызывается ПЕРЕД материализацией
-    today_all — view читает b.klass.
+    медианной цене за м². Класс отражает СПИСОЧНЫЙ уровень ЖК, поэтому медиану
+    считаем от списочной цены = COALESCE(old_price, price) / площадь, а НЕ от
+    base_meter_price (он с 2026-06-20 = цена со скидкой за м², см. build_rows):
+    скидки не должны двигать класс между тирами. Курируемым/дефолтным ЖК цена не
+    нужна — блоки без снапшотов всё равно классифицируются. Вызывается ПЕРЕД
+    материализацией today_all — view читает b.klass.
     """
-    # Медиана base_meter_price по последнему срезу каждого блока.
+    # Медиана списочной цены за м² по последнему срезу каждого блока.
     rows = conn.execute(
         """
         WITH block_latest AS (
@@ -368,11 +370,13 @@ def refresh_block_classes(conn: sqlite3.Connection) -> None:
             FROM snapshots s JOIN flats f ON f.id = s.flat_id
             GROUP BY f.block_id
         )
-        SELECT f.block_id, s.base_meter_price
+        SELECT f.block_id,
+               CAST(ROUND(COALESCE(s.old_price, s.price) * 1.0 / f.area) AS INTEGER)
         FROM snapshots s
         JOIN flats f ON f.id = s.flat_id
         JOIN block_latest bl ON bl.bid = f.block_id AND bl.sd = s.scan_date
-        WHERE s.base_meter_price IS NOT NULL AND s.base_meter_price > 0
+        WHERE COALESCE(s.old_price, s.price) IS NOT NULL
+          AND f.area IS NOT NULL AND f.area > 0
         """
     ).fetchall()
     prices: dict[int, list[float]] = {}

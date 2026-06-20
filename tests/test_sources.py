@@ -93,20 +93,22 @@ def test_build_rows_links_flat_to_block_and_namespaces_ids():
     assert flats[0]["is_studio"] == 0
     assert snaps[0]["discount_pct"] == 16.67
     assert snaps[0]["has_promo"] == 1
-    # база за м² — от БАЗОВОЙ (списочной) цены old_price=12M, не от price=10M:
-    # round(12_000_000 / 50) = 240_000 (см. также след. тест).
-    assert snaps[0]["base_meter_price"] == 240_000
+    # ₽/м² — от ИТОГОВОЙ цены со скидкой (promo_price=price=10M), не от
+    # списочной old_price=12M: round(10_000_000 / 50) = 200_000.
+    assert snaps[0]["base_meter_price"] == 200_000
 
 
-def test_build_rows_base_meter_uses_list_price_not_discounted():
-    """база_за_м² согласована со столбцом базовая_цена (= old_price)."""
+def test_build_rows_base_meter_uses_discounted_price():
+    """₽/м² (база_за_м²) считается от итоговой цены со скидкой, не списочной."""
     result = CollectResult(
         blocks=[NormBlock(native_id="b", name="ЖК", slug="b")],
         flats=[NormFlat(native_id=1, native_block_id="b", rooms=1, area=65.9,
                         floor=5, price=39_210_500, old_price=46_130_000)],
     )
     _, _, snaps = build_rows("MR Group", result, scan_date="d", scan_ts="t")
-    assert snaps[0]["base_meter_price"] == round(46_130_000 / 65.9)  # 700_000
+    # promo_price = price = 39_210_500 (нет отдельной программы → итог = нал
+    # после прямой скидки): round(39_210_500 / 65.9) = 595_000.
+    assert snaps[0]["base_meter_price"] == round(39_210_500 / 65.9)  # 595_000
 
 
 def test_build_rows_zero_ceiling_becomes_null():

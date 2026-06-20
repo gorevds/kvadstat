@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS snapshots (
     status           TEXT,
     price            INTEGER,         -- база (полная оплата)
     meter_price      INTEGER,         -- цена за м² с ипотечной программой
-    base_meter_price INTEGER,         -- цена за м² при оплате налом = round(price/area)
+    base_meter_price INTEGER,         -- ₽/м² от итоговой цены со скидкой = round(promo_price/area)
     promo_price      INTEGER,         -- итоговая цена с программой = round(meter_price*area)
     discount_pct     REAL,            -- размер скидки от базы, 0..100
     has_promo        INTEGER NOT NULL DEFAULT 0,  -- 1 если discount_pct >= 0.5

@@ -132,7 +132,8 @@ def test_promo_detection_for_known_discounted_flat():
     }
     row = to_snapshot_row(item, scan_date="2026-05-15", scan_ts="t")
     assert row["promo_price"] == 18_998_951  # 442_866 * 42.9
-    assert row["base_meter_price"] == 476_200  # 20_428_980 / 42.9
+    # ₽/м² — от ИТОГОВОЙ цены с программой (promo_price), не от наличной price:
+    assert row["base_meter_price"] == round(18_998_951 / 42.9)  # 442_866
     assert 6.9 < row["discount_pct"] < 7.1
     assert row["has_promo"] == 1
 
