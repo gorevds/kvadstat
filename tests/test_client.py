@@ -136,3 +136,13 @@ def test_fetch_still_understands_legacy_flat_payload():
     responses.add(responses.GET, BLOCK_URL, json={"block": {}, "flats": []}, status=200)
     items = PikClient(retries=0, backoff=lambda _i: 0).fetch_block_flats(block_id=1165)
     assert [it["id"] for it in items] == [1]
+
+
+@responses.activate
+def test_fetch_retries_on_transient_500():
+    responses.add(responses.GET, BLOCK_URL, status=500,
+                  json={"success": False, "data": {"error": "FATAL_ERROR"}})
+    responses.add(responses.GET, BLOCK_URL, json=_page(1, 1, 1), status=200)
+    responses.add(responses.GET, BLOCK_URL, json=_page(2, 1, 0), status=200)
+    items = PikClient(retries=2, backoff=lambda _i: 0).fetch_block_flats(block_id=1165)
+    assert len(items) == 1

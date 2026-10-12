@@ -32,7 +32,10 @@ _BLOCK_HEAVY_KEYS = frozenset({
     "titleIntroSlider", "namePrepositional",
 })
 
-_RETRYABLE_STATUS = (429, 502, 503, 504)
+# 500 — тоже ретраим: /v2/filter под нагрузкой эпизодически отвечает
+# 500 FATAL_ERROR на середине пагинации блока, повтор через 1-5 с проходит;
+# без ретрая одна такая страница выбрасывала весь блок в skipped.
+_RETRYABLE_STATUS = (429, 500, 502, 503, 504)
 
 
 class PikApiError(RuntimeError):
