@@ -39,6 +39,10 @@ def _has_cyrillic(s: str) -> bool:
     return any('а' <= c.lower() <= 'я' or c.lower() == 'ё' for c in s)
 _PAGE_SIZE = 500          # сейчас вся выдача (~2k) влезает в один запрос, но
 _MAX_PAGES = 20           # пагинируем на случай роста
+# NB (2026-10): API игнорирует page/numberElementsPage/type и на КАЖДУЮ
+# страницу отдаёт весь каталог (~1.4k лотов вкл. офисы/кладовки/машиноместа,
+# ~15 МБ JSON, 20-60 с). Без стоп-условия по «нет новых id» обход крутил все
+# 20 страниц: ~15 минут, ×20 дублей в памяти и ложный «хвост потерян».
 
 log = logging.getLogger("kvadstat.sources.ingrad")
 
@@ -59,6 +63,19 @@ def _settlement_from_house(house: dict | None) -> str | None:
     # fallback на «settling_text» — но он часто длинный «1 квартал 2024 г.»
     s = house.get("settling_text")
     return s if s else label
+
+
+def _plan_url(v) -> str | None:
+    """planning/imageMain → URL картинки. С ~2026-05 `planning` — объект
+    `{id, code, image, imageFurniture, …}`, а не строка; dict в plan_url
+    валил весь upsert (`Error binding parameter … type 'dict'`)."""
+    if isinstance(v, dict):
+        v = v.get("image") or v.get("imageFurniture")
+    return v if isinstance(v, str) and v.strip() else None
+
+
+def _str_or_none(v) -> str | None:
+    return v if isinstance(v, str) and v else None
 
 
 def _to_norm(fl: dict) -> NormFlat | None:
@@ -91,9 +108,9 @@ def _to_norm(fl: dict) -> NormFlat | None:
         settlement_date=_settlement_from_house(house),
         url=url,
         # `finish` приходит уже человеческой строкой («Без отделки», «WhiteBox»)
-        finish=fl.get("finish"),
+        finish=_str_or_none(fl.get("finish")),
         number=str(fl["number"]) if fl.get("number") is not None else None,
-        plan_url=fl.get("planning") or fl.get("imageMain"),
+        plan_url=_plan_url(fl.get("planning")) or _plan_url(fl.get("imageMain")),
         # Инград — массовый жилой застройщик, апартаментов не строит.
         # isPenthouse — премиум-планировка, но юридически жилая квартира.
         is_apartment=False,
@@ -143,6 +160,7 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
     skipped = 0
     total: int | None = None
     items_seen = 0
+    seen_ids: set = set()
     for _ in range(_MAX_PAGES):
         # API ингреда регулярно отвечает 30-60 сек на полный list — дефолт
         # 40s даёт false-negative при нормальной работе. 90s + ретраи из
@@ -154,6 +172,10 @@ def collect(*, session: requests.Session | None = None) -> CollectResult:
         items = payload.get("list") or []
         if total is None:
             total = payload.get("allCount")
+        # сервер игнорирует page — та же выдача повторно; новых id нет → конец
+        items = [fl for fl in items
+                 if isinstance(fl, dict) and fl.get("id") not in seen_ids]
+        seen_ids.update(fl.get("id") for fl in items)
         items_seen += len(items)
         if not items:
             break

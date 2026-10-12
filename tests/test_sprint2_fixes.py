@@ -292,3 +292,26 @@ def test_pik_source_promo_math_for_two_room_no_discount():
     new = snap_rows[0]
     assert new["promo_price"] == legacy["promo_price"]
     assert new["has_promo"] == 0 == legacy["has_promo"]
+
+
+def test_pik_norm_flat_filter_format():
+    """/v2/filter (с 2026-10): нет block_id/url/layout_id, студия — rooms=-1 +
+    isStudio, finish — bool + whiteBox, план — layout.flatPlanSvg."""
+    item = {
+        "id": 641856, "status": "free", "floor": 12, "rooms": -1, "isStudio": 1,
+        "area": 19.9, "price": 6_982_910, "meterPrice": 350_900, "number": "241",
+        "finish": False, "whiteBox": True, "bulkId": 6799,
+        "block": {"id": 21, "name": "Восточное Бутово", "url": "mkr-vostochnoe-butovo"},
+        "bulk": {"id": 6799, "name": "Корпус 48", "settlementDate": "2028-07-15"},
+        "section": {"id": 16200, "number": 2},
+        "layout": {"id": 72267, "flatPlanSvg": "https://c/l.svg", "render": "https://c/r.png"},
+    }
+    nf = pik_source._norm_flat(item)
+    assert nf.native_block_id == 21
+    assert nf.rooms == 0
+    assert nf.url == "https://www.pik.ru/flat/641856"
+    assert nf.finish == "WhiteBox"
+    assert nf.plan_url == "https://c/l.svg"
+    assert (nf.bulk_id, nf.section_id, nf.layout_id) == (6799, 16200, 72267)
+    assert nf.settlement_date == "2028-07-15"
+    assert pik_source._finish({"finish": True, "furniture": False}) == "С отделкой"

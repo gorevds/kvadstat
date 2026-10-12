@@ -32,6 +32,22 @@ DEFAULT_WORKERS = 6
 
 log = logging.getLogger("kvadstat.sources.pik")
 
+_FLAT_URL = "https://www.pik.ru/flat/{id}"
+
+
+def _finish(item: dict) -> str | None:
+    """legacy /v2/flat: finish = {isFinish, whiteBox, furniture};
+    /v2/filter (с 2026-10): finish — bool, whiteBox/furniture — на верхнем
+    уровне item. Сводим к dict-форме и отдаём в общий _finish_label."""
+    finish = item.get("finish")
+    if isinstance(finish, dict) or finish is None:
+        return _finish_label(finish)
+    return _finish_label({
+        "isFinish": bool(finish),
+        "whiteBox": bool(item.get("whiteBox")),
+        "furniture": bool(item.get("furniture")),
+    })
+
 
 def _norm_flat(item: dict) -> NormFlat:
     """PIK API item → NormFlat. Cохраняем всю промо-семантику оригинального
@@ -44,6 +60,8 @@ def _norm_flat(item: dict) -> NormFlat:
     section: dict = section_raw if isinstance(section_raw, dict) else {}
     layout_raw = item.get("layout")
     layout: dict = layout_raw if isinstance(layout_raw, dict) else {}
+    block_raw = item.get("block")
+    block: dict = block_raw if isinstance(block_raw, dict) else {}
 
     rate, mort_name = _best_mortgage(item)
     price = item.get("price")
@@ -54,8 +72,11 @@ def _norm_flat(item: dict) -> NormFlat:
     )
 
     rooms_raw = item.get("rooms")
-    # PIK API: rooms 0 — студия. Сохраняем int.
-    if rooms_raw is None:
+    # PIK API: rooms 0 — студия. Сохраняем int. /v2/filter отдаёт студию как
+    # rooms=-1 + isStudio=1 (roomsFact=1) — нормализуем к 0.
+    if item.get("isStudio") or item.get("is_studio"):
+        rooms = 0
+    elif rooms_raw is None:
         rooms = None
     elif isinstance(rooms_raw, int):
         rooms = rooms_raw
@@ -64,17 +85,19 @@ def _norm_flat(item: dict) -> NormFlat:
             rooms = int(rooms_raw)
         except (TypeError, ValueError):
             rooms = None
+    if rooms is not None and rooms < 0:
+        rooms = 0
 
     # Эвристика «апартаменты» на уровне квартиры (build_rows добавит блочную)
     is_apart_flat = any(
         "апарт" in (s or "").lower()
         for s in (bulk.get("name"), item.get("name"),
-                  (item.get("block") or {}).get("name"))
+                  block.get("name"))
     )
 
     return NormFlat(
         native_id=item["id"],
-        native_block_id=item["block_id"],
+        native_block_id=item.get("block_id") or block.get("id"),
         rooms=rooms,
         area=area,
         floor=item.get("floor"),
@@ -84,11 +107,13 @@ def _norm_flat(item: dict) -> NormFlat:
         status=item.get("status"),
         bulk_name=bulk.get("name"),
         section_no=section.get("number"),
-        settlement_date=item.get("settlementDate") or bulk.get("settlement_date"),
-        url=item.get("url"),
-        finish=_finish_label(item.get("finish")),
+        settlement_date=(item.get("settlementDate") or bulk.get("settlement_date")
+                         or bulk.get("settlementDate")),
+        url=item.get("url") or _FLAT_URL.format(id=item["id"]),
+        finish=_finish(item),
         number=item.get("number"),
-        plan_url=layout.get("flat_plan_svg") or layout.get("flat_plan_render"),
+        plan_url=(layout.get("flat_plan_svg") or layout.get("flat_plan_render")
+                  or layout.get("flatPlanSvg") or layout.get("render")),
         is_apartment=is_apart_flat,
         ceiling_height=item.get("ceilingHeight"),
         area_kitchen=item.get("areaKitchen"),
@@ -96,9 +121,9 @@ def _norm_flat(item: dict) -> NormFlat:
         mortgage_min_rate=rate,
         mortgage_best_name=mort_name,
         pdf_url=item.get("pdf"),
-        bulk_id=item.get("bulk_id"),
-        section_id=item.get("section_id"),
-        layout_id=item.get("layout_id"),
+        bulk_id=item.get("bulk_id") or item.get("bulkId") or bulk.get("id"),
+        section_id=item.get("section_id") or section.get("id"),
+        layout_id=item.get("layout_id") or layout.get("id"),
         updated_at=item.get("updatedAt"),
         promo_price=promo_price,
         discount_pct=discount_pct,
@@ -127,7 +152,8 @@ def _norm_block(items: list[dict], block_id: int) -> NormBlock | None:
     for it in items:
         bulk_raw = it.get("bulk")
         bulk: dict = bulk_raw if isinstance(bulk_raw, dict) else {}
-        for v in (bulk.get("floors"), it.get("floor")):
+        # maxFloor — этажность секции в /v2/filter (bulk.floors там нет)
+        for v in (bulk.get("floors"), it.get("maxFloor"), it.get("floor")):
             if v is None:
                 continue
             try:

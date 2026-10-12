@@ -843,6 +843,43 @@ def test_ingrad_second_house_fills_missing_coords(monkeypatch):
     assert b.meta["floors_max"] == 25
 
 
+def test_ingrad_planning_object_becomes_url_string():
+    """2026: `planning` — объект {image, …}; dict в plan_url ронял upsert
+    (`Error binding parameter 20: type 'dict' is not supported`)."""
+    base = {"type": "flat", "id": 1, "price": 1, "square": 1, "rooms": 1,
+            "status": "free", "estateId": {"code": "z", "name": "Z"}}
+    nf = ingrad._to_norm({**base, "planning": {"id": 5, "image": "https://x/p.png"},
+                          "imageMain": ""})
+    assert nf.plan_url == "https://x/p.png"
+    nf = ingrad._to_norm({**base, "planning": {"image": ""}, "imageMain": "https://x/m.png"})
+    assert nf.plan_url == "https://x/m.png"
+    nf = ingrad._to_norm({**base, "planning": "https://x/legacy.png"})
+    assert nf.plan_url == "https://x/legacy.png"
+    nf = ingrad._to_norm({**base, "planning": None, "imageMain": "", "finish": {"a": 1}})
+    assert nf.plan_url is None and nf.finish is None
+
+
+def test_ingrad_stops_when_api_ignores_page(monkeypatch):
+    """API игнорирует page и отдаёт весь каталог на каждую страницу: обход
+    должен остановиться на второй (нет новых id), без 20 страниц дублей и
+    без ложного «хвост потерян» (skipped)."""
+    page = {"allCount": 2, "list": [
+        {"type": "flat", "id": i, "price": 1, "square": 1, "rooms": 1,
+         "status": "free", "estateId": {"code": "z", "name": "Z"}}
+        for i in (1, 2)]}
+    calls = []
+
+    def fake(*a, **k):
+        calls.append(k["params"]["page"])
+        return page
+
+    monkeypatch.setattr("kvadstat.sources.ingrad.request_json", fake)
+    result = ingrad.collect()
+    assert calls == [1, 2]
+    assert len(result.flats) == 2
+    assert result.skipped == 0
+
+
 def test_ingrad_skips_latin_metro_for_post_hoc_assignment():
     """Latin-slug метро не пишем — пусть nearest-station post-hoc подберёт."""
     estate = {"code": "x", "name": "X", "metro": "medvedkovo",

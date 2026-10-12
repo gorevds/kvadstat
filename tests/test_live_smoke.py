@@ -41,14 +41,16 @@ def _get(url, **kw):
 
 
 def test_live_pik_flat_api():
-    data = _get("https://api.pik.ru/v2/flat",
-                params={"block_id": 1165, "types": 1, "page": 1})
-    # payload — объект с block + flats (см. client.fetch_block_flats)
-    assert "block" in data, "v2/flat: пропал ключ block"
-    flats = data.get("flats") or []
-    if not flats:
+    # /v2/flat мёртв с 2026-10 (500 FATAL_ERROR / голый []); сайт и
+    # client.fetch_block_flats ходят в /v2/filter
+    from kvadstat.client import BASE_URL, PAGE_SIZE
+    data = _get(BASE_URL, params={"block": 1165, "types": 1, "onlyFlats": 1,
+                                  "flatLimit": PAGE_SIZE, "flatPage": 1})
+    assert "blocks" in data, "v2/filter: пропал ключ blocks"
+    if not data["blocks"]:
         pytest.skip("блок 1165 без квартир в продаже — форму списка не проверить")
-    assert "id" in flats[0] and "price" in flats[0]
+    flats = data["blocks"][0].get("flats") or []
+    assert flats and "id" in flats[0] and "price" in flats[0]
 
 
 def test_live_fsk_complexes():
