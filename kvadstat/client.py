@@ -32,6 +32,27 @@ _BLOCK_HEAVY_KEYS = frozenset({
     "titleIntroSlider", "namePrepositional",
 })
 
+# Тяжёлые flat-поля filter-ответа: квартира ~23 КБ JSON, из них ~16 КБ —
+# `benefits` (полные описания ипотечных программ) и ~5 КБ — промо-дубли.
+# Сырые items копятся до конца пагинации блока × 6 воркеров → пик скана
+# ~700 МБ RSS. Нормализации нужны только benefits.mortgage[].{name, isMain}
+# (mapping._best_mortgage) — остальное срезаем сразу при разборе страницы.
+_FLAT_HEAVY_KEYS = frozenset({
+    "mainBenefit", "currentBenefit", "equalizerBenefit", "attributesData",
+})
+
+
+def _slim_flat(fl: dict) -> None:
+    """In-place: выкинуть _FLAT_HEAVY_KEYS и урезать benefits до ипотек."""
+    for k in _FLAT_HEAVY_KEYS:
+        fl.pop(k, None)
+    benefits = fl.get("benefits")
+    if isinstance(benefits, dict):
+        fl["benefits"] = {"mortgage": [
+            {"name": m.get("name"), "isMain": m.get("isMain")}
+            for m in benefits.get("mortgage") or [] if isinstance(m, dict)
+        ]}
+
 # 500 — тоже ретраим: /v2/filter под нагрузкой эпизодически отвечает
 # 500 FATAL_ERROR на середине пагинации блока, повтор через 1-5 с проходит;
 # без ретрая одна такая страница выбрасывала весь блок в skipped.
@@ -154,6 +175,7 @@ def _extract_flats(payload, *, block_id: int, page: int) -> list[dict]:
                     continue
                 own = fl.get("block")
                 fl["block"] = {**block_info, **(own if isinstance(own, dict) else {})}
+                _slim_flat(fl)
                 out.append(fl)
         return out
     flats = payload.get("flats") or []
